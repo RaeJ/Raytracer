@@ -27,8 +27,8 @@ const float focal = SCREEN_WIDTH * 2;
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec3 light_position(0,-0.5,-0.7);
-vec3 light_power = 11.1f*vec3( 1, 1, 1 );
+vec4 light_position(0,-0.5,-0.7,1);
+vec3 light_power = 14.f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 #define PI 3.14159265
 
@@ -39,7 +39,7 @@ struct Intersection
 {
   vec4 position;
   float distance;
-  int triangleIndex;
+  int index;
 };
 
 /* ----------------------------------------------------------------------------*/
@@ -54,6 +54,7 @@ bool ClosestIntersection(
 );
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
+vec3 DirectLight( const Intersection& i );
 
 
 int main( int argc, char* argv[] )
@@ -91,11 +92,26 @@ void Draw(screen* screen)
       Intersection c_i;
 
       if( ClosestIntersection( start, direction, c_i ) ){
-        Triangle close = triangles[c_i.triangleIndex];
-        PutPixelSDL(screen, x, y, close.colour);
+        Triangle close = triangles[c_i.index];
+        vec3 power = DirectLight( c_i );
+        PutPixelSDL( screen, x, y, power * close.colour );
       }
     }
   }
+}
+
+/*Place updates of parameters here*/
+void Update()
+{
+  static int t = SDL_GetTicks();
+  /* Compute frame time */
+  int t2 = SDL_GetTicks();
+  float dt = float(t2-t);
+  t = t2;
+  /*Good idea to remove this*/
+  std::cout << "Render time: " << dt << " ms." << std::endl;
+  /* Update variables*/
+  UserInput();
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
@@ -127,25 +143,22 @@ bool ClosestIntersection(vec4 start, vec4 dir,
         found = true;
         closestIntersections.position = start + dir * x_vec.x;
         closestIntersections.distance = x_vec.x;
-        closestIntersections.triangleIndex = i;
+        closestIntersections.index = i;
       }
     }
   }
   return found;
 }
 
-/*Place updates of parameters here*/
-void Update()
-{
-  static int t = SDL_GetTicks();
-  /* Compute frame time */
-  int t2 = SDL_GetTicks();
-  float dt = float(t2-t);
-  t = t2;
-  /*Good idea to remove this*/
-  std::cout << "Render time: " << dt << " ms." << std::endl;
-  /* Update variables*/
-  UserInput();
+vec3 DirectLight( const Intersection& i ){
+  mat4 matrix;  TransformationMatrix(matrix);
+  vec3 radius = vec3 ( matrix * light_position ) - vec3( i.position );
+  float A = 4 * PI * glm::dot( radius, radius );
+  vec3 normal = vec3( triangles[i.index].normal );
+  float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( normal ) );
+  r_dot_n = max( r_dot_n, 0.0f );
+
+  return ( light_power * r_dot_n ) / A;
 }
 
 void TransformationMatrix(glm::mat4& M){
@@ -219,6 +232,6 @@ void TransformationMatrix(glm::mat4& M){
     if( keystate[SDL_SCANCODE_R] ) {
       camera = vec4( 0, 0, -3.00, 1 );
       theta = vec3( 0.0, 0.0, 0.0 );
-      light_position = vec3(0,-0.5,-0.7);
+      light_position = vec4(0,-0.5,-0.7,1);
     }
   }
