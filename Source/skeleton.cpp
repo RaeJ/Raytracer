@@ -136,7 +136,7 @@ bool ClosestIntersection(vec4 start, vec4 dir,
     direction.z = dir.z;
 
     mat3 A(-direction,e1,e2);
-    vec3 x_vec = glm::inverse(A)*b;
+    vec3 x_vec = glm::inverse( A ) * b;
 
     if(x_vec.x >= 0 && x_vec.y >= 0 && x_vec.z >= 0 && (x_vec.y+x_vec.z) < 1){
       if(x_vec.x < closestIntersections.distance){
@@ -152,11 +152,22 @@ bool ClosestIntersection(vec4 start, vec4 dir,
 
 vec3 DirectLight( const Intersection& i ){
   mat4 matrix;  TransformationMatrix(matrix);
-  vec3 radius = vec3 ( matrix * light_position ) - vec3( i.position );
+  vec4 light_location = matrix * light_position;
+
+  vec3 radius = vec3 ( light_location ) - vec3( i.position );
   float A = 4 * PI * glm::dot( radius, radius );
   vec3 normal = vec3( triangles[i.index].normal );
   float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( normal ) );
   r_dot_n = max( r_dot_n, 0.0f );
+
+  vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
+  vec4 start = i.position + 0.001f * direction;
+  Intersection c_i;
+  ClosestIntersection( start, direction, c_i );
+
+  if( c_i.distance < glm::length( start - light_location ) ){
+    r_dot_n = 0;
+  }
 
   return ( light_power * r_dot_n ) / A;
 }
