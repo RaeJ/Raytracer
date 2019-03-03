@@ -94,7 +94,7 @@ void Draw(screen* screen)
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
         vec3 power = DirectLight( c_i );
-        PutPixelSDL( screen, x, y, power * close.colour );
+        PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
       }
     }
   }
