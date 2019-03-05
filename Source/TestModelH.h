@@ -6,6 +6,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+float MULT = ( 5.0f / 12.0f );
+
 // Used to describe a triangular surface:
 class Triangle
 {
@@ -70,6 +72,29 @@ void LoadTestModel( std::vector<Triangle>& triangles )
 	vec4 G(L,L,L,1);
 	vec4 H(0,L,L,1);
 
+	MULT = ( 5.0f / 12.0f );
+	float W = L * MULT;
+
+	vec4 I(W,L,L,1);
+	vec4 J(L-W,L,L,1);
+	vec4 K(W,L,0,1);
+	vec4 M(L-W,L,0,1);
+
+	vec4 N(W,L,L-W,1);
+	vec4 O(L-W,L,L-W,1);
+	vec4 P(W,L,W,1);
+	vec4 Q(L-W,L,W,1);
+
+	// Ceiling
+	triangles.push_back( Triangle( E, M, G, white ) );
+	triangles.push_back( Triangle( F, H, I, white ) );
+	triangles.push_back( Triangle( K, F, I, white ) );
+	triangles.push_back( Triangle( M, J, G, white ) );
+	triangles.push_back( Triangle( N, I, J, white ) );
+	triangles.push_back( Triangle( J, O, N, white ) );
+	triangles.push_back( Triangle( M, K, P, white ) );
+	triangles.push_back( Triangle( P, Q, M, white ) );
+
 	// Floor:
 	triangles.push_back( Triangle( C, B, A, white ) );
 	triangles.push_back( Triangle( C, D, B, white ) );
@@ -81,10 +106,6 @@ void LoadTestModel( std::vector<Triangle>& triangles )
 	// Right wall
 	triangles.push_back( Triangle( F, B, D, red ) );
 	triangles.push_back( Triangle( H, F, D, red ) );
-
-	// Ceiling
-	triangles.push_back( Triangle( E, F, G, white ) );
-	triangles.push_back( Triangle( F, H, G, white ) );
 
 	// Back wall
 	triangles.push_back( Triangle( G, D, C, white ) );
