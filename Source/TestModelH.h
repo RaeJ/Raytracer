@@ -85,15 +85,19 @@ void LoadTestModel( std::vector<Triangle>& triangles )
 	vec4 P(W,L,W,1);
 	vec4 Q(L-W,L,W,1);
 
+	// // Ceiling
+	// triangles.push_back( Triangle( E, M, G, white ) );
+	// triangles.push_back( Triangle( F, H, I, white ) );
+	// triangles.push_back( Triangle( K, F, I, white ) );
+	// triangles.push_back( Triangle( M, J, G, white ) );
+	// triangles.push_back( Triangle( N, I, J, white ) );
+	// triangles.push_back( Triangle( J, O, N, white ) );
+	// triangles.push_back( Triangle( M, K, P, white ) );
+	// triangles.push_back( Triangle( P, Q, M, white ) );
+
 	// Ceiling
-	triangles.push_back( Triangle( E, M, G, white ) );
-	triangles.push_back( Triangle( F, H, I, white ) );
-	triangles.push_back( Triangle( K, F, I, white ) );
-	triangles.push_back( Triangle( M, J, G, white ) );
-	triangles.push_back( Triangle( N, I, J, white ) );
-	triangles.push_back( Triangle( J, O, N, white ) );
-	triangles.push_back( Triangle( M, K, P, white ) );
-	triangles.push_back( Triangle( P, Q, M, white ) );
+	triangles.push_back( Triangle( E, F, G, white ) );
+	triangles.push_back( Triangle( F, H, G, white ) );
 
 	// Floor:
 	triangles.push_back( Triangle( C, B, A, white ) );

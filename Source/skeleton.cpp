@@ -4,17 +4,13 @@
 #include "SDLauxiliary.h"
 #include "TestModelH.h"
 #include <stdint.h>
+#include "rasteriser.h"
 
 using namespace std;
 using glm::vec3;
 using glm::mat3;
 using glm::vec4;
 using glm::mat4;
-
-
-#define SCREEN_WIDTH 256
-#define SCREEN_HEIGHT 256
-#define FULLSCREEN_MODE false
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -24,13 +20,6 @@ struct PhotonBeam
   vec4 start;
   vec4 end;
   float offset;
-  float radius;
-};
-
-struct AABB
-{
-  vec4 max;
-  vec4 min;
   float radius;
 };
 
@@ -69,17 +58,16 @@ vector<Triangle> triangles;
 vector<AABB> beams;
 
 float m = std::numeric_limits<float>::max();
-const float focal = SCREEN_WIDTH * 2;
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-1.2,-0.5,1);
+// vec4 light_position(0,-1.2,-0.5,1);
+vec4 light_position(0,-0.5,-0.7,1);
 vec3 light_power = 14.f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 vec4 root_min( 1.0f, 1.0f, 1.0f, 1.0f );
 vec4 root_max( -1.0f, -1.0f, -1.0f, 1.0f );
-#define PI 3.14159265
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -94,7 +82,7 @@ bool ClosestIntersection(
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
-void BasicPhotonBeams( int photon_number );
+void BasicPhotonBeams( screen* screen );
 
 
 int main( int argc, char* argv[] )
@@ -116,7 +104,7 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
-void Draw(screen* screen)
+void Draw( screen* screen )
 {
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
@@ -137,6 +125,7 @@ void Draw(screen* screen)
       }
     }
   }
+  BasicPhotonBeams( screen );
 }
 
 /*Place updates of parameters here*/
@@ -153,23 +142,27 @@ void Update()
   UserInput();
 }
 
-void BasicPhotonBeams( int photon_number ){
+void BasicPhotonBeams( screen* screen ){
+  mat4 matrix;  TransformationMatrix( matrix );
   PhotonBeam example; Intersection i;
+  vec4 light_location = light_position;
   example.start = light_position;
+  vec4 trying = vec4( light_location.x, light_location.y+0.5, light_location.z, 1.0f );
 
-  vec4 from_origin = vec4( 0, 0, 0, 1 ) - example.start;
+  // vec4 from_origin = vec4( 0, 0, 0, 1 ) - example.start;
+  vec4 from_origin = trying - example.start;
   vec4 direction = glm::normalize( from_origin );
   ClosestIntersection( example.start, direction, i );
   example.end = i.position;
   example.offset = 0;
-  example.radius = 0.2f;
+  example.radius = 0.1f;
 
   AABB beam_box; beam_box.radius = example.radius;
   beam_box.max = vec4( example.end.x + example.radius,
                        example.end.y,
                        example.end.z + example.radius,
                        1.0f );
-  beam_box.max = vec4( example.start.x - example.radius,
+  beam_box.min = vec4( example.start.x - example.radius,
                        example.start.y,
                        example.start.z - example.radius,
                        1.0f );
@@ -177,51 +170,29 @@ void BasicPhotonBeams( int photon_number ){
   beams.push_back( beam_box );
 
   struct Node *root = newNode(beam_box);
+
+  // AABB beam_box;
+  // beam_box.radius = 0.05;
+  // beam_box.max = vec4( 0.0f + beam_box.radius,
+  //                      0.5f,
+  //                      0.0f + beam_box.radius,
+  //                      1.0f );
+  // beam_box.min = vec4( 0.0f - beam_box.radius,
+  //                      -0.5f,
+  //                      0.0f - beam_box.radius,
+  //                      1.0f );
+
+  DrawBoundingBox( screen, beam_box, matrix );
 }
 
-void BeamIntersections( vec4 start, vec4 dir,
-                         Intersection &closest ) {
-
-  closest.distance = m;
-
-  mat4 matrix;  TransformationMatrix(matrix);
-
-  for(int i = 0; i < beams.size(); i++){
-    float r   = beams[i].radius;
-    vec4 max  = beams[i].max;
-    vec4 min  = beams[i].min;
-
-    // First dimension Normal (x)
-    vec4 v00 = max;
-    vec4 v10 = vec4( v00.x - ( 2 * r ), v00.y, v00.z, 1.0f );
-    vec4 v20 = vec4( v00.x - ( 2 * r ), min.y, v00.z, 1.0f );
-    v00 = matrix * v00; v10 = matrix * v10; v20 = matrix * v20;
-
-    vec3 e10 = vec3(v10.x-v00.x,v10.y-v00.y,v10.z-v00.z);
-	  vec3 e20 = vec3(v20.x-v00.x,v20.y-v00.y,v20.z-v00.z);
-	  vec3 normal30 = glm::normalize( glm::cross( e20, e10 ) );
-
-    // Second dimension Normal (z)
-    vec4 v01 = vec4( max.x - ( 2 * r ), max.y, max.z, 1.0f );
-    vec4 v11 = vec4( v01.x, v01.y, min.z, 1.0f );
-    vec4 v21 = vec4( v11.x, min.y, v11.z, 1.0f );
-    v01 = matrix * v01; v11 = matrix * v11; v21 = matrix * v21;
-
-    vec3 e11 = vec3(v11.x-v01.x,v11.y-v01.y,v11.z-v01.z);
-	  vec3 e21 = vec3(v21.x-v01.x,v21.y-v01.y,v21.z-v01.z);
-	  vec3 normal31 = glm::normalize( glm::cross( e21, e11 ) );
-
-    // Third dimension Normal (y)
-    vec4 v02 = min;
-    vec4 v12 = vec4( v02.x + ( 2 * r ), v02.y, v02.z, 1.0f );
-    vec4 v22 = vec4( v12.x, min.y, min.z + ( 2 * r ), 1.0f );
-    v02 = matrix * v02; v12 = matrix * v12; v22 = matrix * v22;
-
-    vec3 e12 = vec3(v12.x-v02.x,v12.y-v02.y,v12.z-v02.z);
-	  vec3 e22 = vec3(v22.x-v02.x,v22.y-v02.y,v22.z-v02.z);
-	  vec3 normal32 = glm::normalize( glm::cross( e22, e12 ) );
-  }
-}
+// void BeamIntersections( vec4 start, vec4 dir,
+//                          Intersection &closest ) {
+//
+//   closest.distance = m;
+//
+//   mat4 matrix;  TransformationMatrix(matrix);
+//   AABB beam = beams[0];
+// }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
                          Intersection &closestIntersections) {
@@ -324,16 +295,16 @@ void TransformationMatrix(glm::mat4& M){
     }
     // Move forward/back/left/right
     if( keystate[SDL_SCANCODE_W] ) {
-      camera.z += 0.005;
+      camera.z += 0.1;
     }
     if( keystate[SDL_SCANCODE_S] ) {
-      camera.z -= 0.005;
+      camera.z -= 0.1;
     }
     if( keystate[SDL_SCANCODE_A] ) {
-      camera.x -= 0.005;
+      camera.x -= 0.1;
     }
     if( keystate[SDL_SCANCODE_D] ) {
-      camera.x += 0.005;
+      camera.x += 0.1;
     }
     // Move the light
     if( keystate[SDL_SCANCODE_I] ) {
@@ -359,6 +330,6 @@ void TransformationMatrix(glm::mat4& M){
     if( keystate[SDL_SCANCODE_R] ) {
       camera = vec4( 0, 0, -3.00, 1 );
       theta = vec3( 0.0, 0.0, 0.0 );
-      light_position = vec4(0,-1.2,-0.5,1);;
+      light_position = vec4(0,-0.5,-0.7,1);;
     }
   }
