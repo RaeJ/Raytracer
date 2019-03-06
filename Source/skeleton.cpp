@@ -151,14 +151,14 @@ void BasicPhotonBeams( screen* screen ){
   beam_box.radius = 0.1;
   vec4 start = light_position;
   vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
-  beam_box.max = vec4( start.x + beam_box.radius,
-                       start.y,
-                       start.z + beam_box.radius,
-                       1.0f
-                     );
-  beam_box.min = vec4( end.x - beam_box.radius,
+  beam_box.max = vec4( end.x + beam_box.radius,
                        end.y,
                        end.z - beam_box.radius,
+                       1.0f
+                     );
+  beam_box.min = vec4( start.x - beam_box.radius,
+                       start.y,
+                       start.z + beam_box.radius,
                        1.0f
                      );
 
