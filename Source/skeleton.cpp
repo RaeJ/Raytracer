@@ -66,12 +66,11 @@ vec4 light_position(0,-0.5,-0.7,1);
 vec3 light_power = 14.f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
-vec4 root_min( 1.0f, 1.0f, 1.0f, 1.0f );
-vec4 root_max( -1.0f, -1.0f, -1.0f, 1.0f );
-
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
 std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 std::normal_distribution<> dis(0.0, 1 );
+
+AABB root;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -86,7 +85,7 @@ bool ClosestIntersection(
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
-void CastPhotonBeams( int number );
+AABB CastPhotonBeams( int number );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b );
 void DrawBoundedBeams( screen* screen );
@@ -95,7 +94,7 @@ void DrawBoundedBeams( screen* screen );
 int main( int argc, char* argv[] )
 {
   LoadTestModel( triangles );
-  CastPhotonBeams( 2 );
+  root = CastPhotonBeams( 2 );
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -159,9 +158,9 @@ void DrawBoundedBeams( screen* screen ){
 
     vec4 start = b.start;
     vec4 end = b.end;
-    vec4 dir = b.start - b.end;
 
-    float j=start.y ;
+    vec4 dir = b.start - b.end;
+    float j=start.y;
 
     vec4 min_prev = vec4( start.x,
                           start.y,
@@ -170,7 +169,7 @@ void DrawBoundedBeams( screen* screen ){
 
     while( j<end.y ){
       AABB beam_box;
-      
+
       if( j + b.radius > end.y ){
         j = end.y;
       } else {
@@ -185,6 +184,7 @@ void DrawBoundedBeams( screen* screen ){
       DrawBoundingBox( screen, beam_box );
     }
   }
+  DrawBoundingBox( screen, root );
 }
 
 void DrawBeam( screen* screen, PhotonBeam& b ){
@@ -197,7 +197,10 @@ void DrawBeam( screen* screen, PhotonBeam& b ){
   DrawLine( screen, v1, v2 );
 }
 
-void CastPhotonBeams( int number ){
+AABB CastPhotonBeams( int number ){
+  vec4 min_point = vec4( m, m, -m, 1 );
+  vec4 max_point = vec4( -m, -m, m, 1 );
+
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin = matrix * light_position;
   vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
@@ -212,27 +215,26 @@ void CastPhotonBeams( int number ){
       beam.start  = origin;
       beam.end    = c_i.position;
       beam.offset = 0;
-      beam.radius = 0.4;
+      beam.radius = 0.01;
       beams.push_back( beam );
 
-      AABB beam_box;
-      vec4 start   = beam.start;
-      vec4 end     = beam.end;
-      float radius = beam.radius;
-      beam_box.max = vec4( end.x + beam.radius,
-                           end.y,
-                           end.z - beam.radius,
-                           1.0f
-                         );
-      beam_box.min = vec4( start.x - beam.radius,
-                           start.y,
-                           start.z + beam.radius,
-                           1.0f
-                         );
+      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
+      max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
+      max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
+      min_point.x = fmin( beam.end.x, fmin( beam.start.x, max_point.x ) );
+      min_point.y = fmin( beam.end.y, fmin( beam.start.y, max_point.y ) );
+      min_point.z = fmax( beam.end.z, fmax( beam.start.z, max_point.z ) );
+
     } else {
       cout << "Direction does not terminate\n";
     }
   }
+
+  AABB root;
+  root.min = min_point;
+  root.max = max_point;
+
+  return root;
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
