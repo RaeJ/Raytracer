@@ -168,9 +168,15 @@ void DrawBoundedBeams( screen* screen ){
                           start.z,
                           1.0f );
 
-    while( j<=end.y ){
+    while( j<end.y ){
       AABB beam_box;
-      j = j + b.radius;
+      
+      if( j + b.radius > end.y ){
+        j = end.y;
+      } else {
+        j = j + b.radius;
+      }
+
       beam_box.min = min_prev;
       float max_x = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
       float max_z = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
