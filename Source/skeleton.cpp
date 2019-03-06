@@ -157,22 +157,27 @@ void DrawBoundedBeams( screen* screen ){
     PhotonBeam b = beams[i];
     DrawBeam( screen, b );
 
-    AABB beam_box;
-    beam_box.radius = b.radius;
     vec4 start = b.start;
     vec4 end = b.end;
-    beam_box.max = vec4( end.x + beam_box.radius,
-                         end.y,
-                         end.z - beam_box.radius,
-                         1.0f
-                       );
-    beam_box.min = vec4( start.x - beam_box.radius,
-                         start.y,
-                         start.z + beam_box.radius,
-                         1.0f
-                       );
+    vec4 dir = b.start - b.end;
 
-    DrawBoundingBox( screen, beam_box );
+    float j=start.y ;
+
+    vec4 min_prev = vec4( start.x,
+                          start.y,
+                          start.z,
+                          1.0f );
+
+    while( j<=end.y ){
+      AABB beam_box;
+      j = j + b.radius;
+      beam_box.min = min_prev;
+      float max_x = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
+      float max_z = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
+      beam_box.max = vec4( max_x, j, max_z, 1.0f );
+      min_prev = beam_box.max;
+      DrawBoundingBox( screen, beam_box );
+    }
   }
 }
 
@@ -201,7 +206,7 @@ void CastPhotonBeams( int number ){
       beam.start  = origin;
       beam.end    = c_i.position;
       beam.offset = 0;
-      beam.radius = 0;
+      beam.radius = 0.4;
       beams.push_back( beam );
 
       AABB beam_box;
