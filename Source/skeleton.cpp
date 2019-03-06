@@ -86,16 +86,16 @@ bool ClosestIntersection(
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
-void BasicPhotonBeams( screen* screen );
 void CastPhotonBeams( int number );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
-void DrawBeams( screen* screen );
+void DrawBeam( screen* screen, PhotonBeam& b );
+void DrawBoundedBeams( screen* screen );
 
 
 int main( int argc, char* argv[] )
 {
   LoadTestModel( triangles );
-  CastPhotonBeams( 100 );
+  CastPhotonBeams( 2 );
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -131,12 +131,11 @@ void Draw( screen* screen )
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
         vec3 power = DirectLight( c_i );
-        // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
-        PutPixelSDL( screen, x, y, ( power ) * close.colour );
+        PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
       }
     }
   }
-  DrawBeams( screen );
+  DrawBoundedBeams( screen );
 }
 
 /*Place updates of parameters here*/
@@ -153,44 +152,38 @@ void Update()
   UserInput();
 }
 
-void BasicPhotonBeams( screen* screen ){
-  mat4 matrix;  TransformationMatrix( matrix );
-  AABB beam_box;
-  beam_box.radius = 0.1;
-  vec4 start = light_position;
-  vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
-  beam_box.max = vec4( end.x + beam_box.radius,
-                       end.y,
-                       end.z - beam_box.radius,
-                       1.0f
-                     );
-  beam_box.min = vec4( start.x - beam_box.radius,
-                       start.y,
-                       start.z + beam_box.radius,
-                       1.0f
-                     );
-
-  Pixel proj1; Vertex v1; v1.position = matrix * start;
-  Pixel proj2; Vertex v2; v2.position = matrix * end;
-  VertexShader( v1, proj1, matrix );
-  VertexShader( v2, proj2, matrix );
-  DrawLine( screen, v1, v2, matrix );
-
-  DrawBoundingBox( screen, beam_box, matrix );
-}
-
-void DrawBeams( screen* screen ){
-  mat4 matrix;  TransformationMatrix( matrix );
+void DrawBoundedBeams( screen* screen ){
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
-    Pixel proj1; Vertex v1; v1.position = b.start;
-    Pixel proj2; Vertex v2; v2.position = b.end;
-    VertexShader( v1, proj1, matrix );
-    VertexShader( v2, proj2, matrix );
-    DrawLine( screen, v1, v2, matrix );
-    // PixelShader( screen, proj1.x, proj1.y, vec3(1,1,1) );
-    // PixelShader( screen, proj2.x, proj2.y, vec3(1,1,1) );
+    DrawBeam( screen, b );
+
+    AABB beam_box;
+    beam_box.radius = b.radius;
+    vec4 start = b.start;
+    vec4 end = b.end;
+    beam_box.max = vec4( end.x + beam_box.radius,
+                         end.y,
+                         end.z - beam_box.radius,
+                         1.0f
+                       );
+    beam_box.min = vec4( start.x - beam_box.radius,
+                         start.y,
+                         start.z + beam_box.radius,
+                         1.0f
+                       );
+
+    DrawBoundingBox( screen, beam_box );
   }
+}
+
+void DrawBeam( screen* screen, PhotonBeam& b ){
+  mat4 matrix;  TransformationMatrix( matrix );
+
+  Pixel proj1; Vertex v1; v1.position = b.start;
+  Pixel proj2; Vertex v2; v2.position = b.end;
+  VertexShader( v1, proj1 );
+  VertexShader( v2, proj2 );
+  DrawLine( screen, v1, v2 );
 }
 
 void CastPhotonBeams( int number ){
@@ -210,6 +203,21 @@ void CastPhotonBeams( int number ){
       beam.offset = 0;
       beam.radius = 0;
       beams.push_back( beam );
+
+      AABB beam_box;
+      vec4 start   = beam.start;
+      vec4 end     = beam.end;
+      float radius = beam.radius;
+      beam_box.max = vec4( end.x + beam.radius,
+                           end.y,
+                           end.z - beam.radius,
+                           1.0f
+                         );
+      beam_box.min = vec4( start.x - beam.radius,
+                           start.y,
+                           start.z + beam.radius,
+                           1.0f
+                         );
     } else {
       cout << "Direction does not terminate\n";
     }
