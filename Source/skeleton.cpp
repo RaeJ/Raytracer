@@ -55,7 +55,7 @@ struct Intersection
 /* GLOBAL VARIABLES                                                            */
 
 vector<Triangle> triangles;
-vector<AABB> beams;
+vector<PhotonBeam> beams;
 
 float m = std::numeric_limits<float>::max();
 
@@ -68,6 +68,10 @@ vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 vec4 root_min( 1.0f, 1.0f, 1.0f, 1.0f );
 vec4 root_max( -1.0f, -1.0f, -1.0f, 1.0f );
+
+std::random_device rd;  //Will be used to obtain a seed for the random number engine
+std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+std::normal_distribution<> dis(0.0, 1 );
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -83,11 +87,15 @@ void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
 void BasicPhotonBeams( screen* screen );
+void CastPhotonBeams( int number );
+vec4 FindDirection( vec4 origin, vec4 centre, float radius );
+void DrawBeams( screen* screen );
 
 
 int main( int argc, char* argv[] )
 {
   LoadTestModel( triangles );
+  CastPhotonBeams( 100 );
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -128,7 +136,7 @@ void Draw( screen* screen )
       }
     }
   }
-  BasicPhotonBeams( screen );
+  DrawBeams( screen );
 }
 
 /*Place updates of parameters here*/
@@ -140,7 +148,7 @@ void Update()
   float dt = float(t2-t);
   t = t2;
   /*Good idea to remove this*/
-  std::cout << "Render time: " << dt << " ms." << std::endl;
+  // std::cout << "Render time: " << dt << " ms." << std::endl;
   /* Update variables*/
   UserInput();
 }
@@ -148,11 +156,9 @@ void Update()
 void BasicPhotonBeams( screen* screen ){
   mat4 matrix;  TransformationMatrix( matrix );
   AABB beam_box;
-  beam_box.radius = 1;
-  // vec4 start = light_position;
-  vec4 start = vec4(0,-1,0,1);
-  vec4 end = vec4(0,1,0,1);
-  // vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
+  beam_box.radius = 0.1;
+  vec4 start = light_position;
+  vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
   beam_box.max = vec4( end.x + beam_box.radius,
                        end.y,
                        end.z - beam_box.radius,
@@ -171,6 +177,55 @@ void BasicPhotonBeams( screen* screen ){
   DrawLine( screen, v1, v2, matrix );
 
   DrawBoundingBox( screen, beam_box, matrix );
+}
+
+void DrawBeams( screen* screen ){
+  mat4 matrix;  TransformationMatrix( matrix );
+  for( int i=0; i<beams.size(); i++ ){
+    PhotonBeam b = beams[i];
+    Pixel proj1; Vertex v1; v1.position = b.start;
+    Pixel proj2; Vertex v2; v2.position = b.end;
+    VertexShader( v1, proj1, matrix );
+    VertexShader( v2, proj2, matrix );
+    DrawLine( screen, v1, v2, matrix );
+    // PixelShader( screen, proj1.x, proj1.y, vec3(1,1,1) );
+    // PixelShader( screen, proj2.x, proj2.y, vec3(1,1,1) );
+  }
+}
+
+void CastPhotonBeams( int number ){
+  mat4 matrix;  TransformationMatrix( matrix );
+  vec4 origin = matrix * light_position;
+  vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  float radius = 0.4f;
+
+  for( int i=0; i<number; i++ ){
+    Intersection c_i;
+    vec4 direction = FindDirection( origin, centre, radius );
+    direction = glm::normalize( direction );
+    if( ClosestIntersection( origin, direction, c_i ) ){
+      PhotonBeam beam;
+      beam.start  = origin;
+      beam.end    = c_i.position;
+      beam.offset = 0;
+      beam.radius = 0;
+      beams.push_back( beam );
+    } else {
+      cout << "Direction does not terminate\n";
+    }
+  }
+}
+
+vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
+  float r = dis( gen );
+  float incR = (rand() % 50) / (float) 100;
+  float t = 2 * PI * r;
+  float p = radius * r * incR;
+  float x = centre.x + ( p * cos( t ) );
+  float z = centre.z + ( p * sin( t ) );
+  vec4 position( x, centre.y, z, 1.0f );
+
+  return( position - origin );
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
