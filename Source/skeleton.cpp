@@ -116,8 +116,8 @@ void Draw( screen* screen )
       float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
 
       vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-      vec4 start = matrix * camera;
-      // vec4 start = camera;
+      // vec4 start = matrix * camera;
+      vec4 start = camera;
       Intersection c_i;
 
       if( ClosestIntersection( start, direction, c_i ) ){
@@ -151,16 +151,16 @@ void BasicPhotonBeams( screen* screen ){
   beam_box.radius = 0.1;
   vec4 start = light_position;
   vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
-  // beam_box.max = vec4( start.x + beam_box.radius,
-  //                      start.y,
-  //                      start.z + beam_box.radius,
-  //                      1.0f
-  //                    );
-  // beam_box.min = vec4( end.x - beam_box.radius,
-  //                      end.y,
-  //                      end.z - beam_box.radius,
-  //                      1.0f
-  //                    );
+  beam_box.max = vec4( start.x + beam_box.radius,
+                       start.y,
+                       start.z + beam_box.radius,
+                       1.0f
+                     );
+  beam_box.min = vec4( end.x - beam_box.radius,
+                       end.y,
+                       end.z - beam_box.radius,
+                       1.0f
+                     );
 
   Pixel proj1; Vertex v1; v1.position = matrix * start;
   Pixel proj2; Vertex v2; v2.position = matrix * end;
@@ -168,7 +168,7 @@ void BasicPhotonBeams( screen* screen ){
   VertexShader( v2, proj2, matrix );
   DrawLine( screen, v1, v2, matrix );
 
-  // DrawBoundingBox( screen, beam_box, matrix );
+  DrawBoundingBox( screen, beam_box, matrix );
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
@@ -210,15 +210,16 @@ bool ClosestIntersection(vec4 start, vec4 dir,
 vec3 DirectLight( const Intersection& i ){
   mat4 matrix;  TransformationMatrix(matrix);
   vec4 light_location = matrix * light_position;
+  vec4 position       = i.position;
 
-  vec3 radius = vec3 ( light_location ) - vec3( i.position );
+  vec3 radius = vec3 ( light_location ) - vec3( position );
   float A = 4 * PI * glm::dot( radius, radius );
   vec4 normal = vec4( triangles[i.index].normal );
   float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( vec3( normal ) ) );
   r_dot_n = max( r_dot_n, 0.0f );
 
   vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
-  vec4 start = i.position + 0.001f * normal;
+  vec4 start = position + 0.001f * normal;
   Intersection c_i;
   ClosestIntersection( start, direction, c_i );
 
