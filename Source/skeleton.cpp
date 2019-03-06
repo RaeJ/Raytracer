@@ -116,8 +116,8 @@ void Draw( screen* screen )
       float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
 
       vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-      // vec4 start = matrix * camera;
-      vec4 start = camera;
+      vec4 start = matrix * camera;
+      // vec4 start = camera;
       Intersection c_i;
 
       if( ClosestIntersection( start, direction, c_i ) ){
@@ -148,9 +148,11 @@ void Update()
 void BasicPhotonBeams( screen* screen ){
   mat4 matrix;  TransformationMatrix( matrix );
   AABB beam_box;
-  beam_box.radius = 0.1;
-  vec4 start = light_position;
-  vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
+  beam_box.radius = 1;
+  // vec4 start = light_position;
+  vec4 start = vec4(0,-1,0,1);
+  vec4 end = vec4(0,1,0,1);
+  // vec4 end = vec4(light_position.x, light_position.y+0.5, light_position.z, 1.0f);
   beam_box.max = vec4( end.x + beam_box.radius,
                        end.y,
                        end.z - beam_box.radius,
