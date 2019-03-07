@@ -91,6 +91,7 @@ AABB CastPhotonBeams( int number );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b );
 void DrawBoundedBeams( screen* screen );
+void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<AABB> child );
 void BoundPhotonBeams();
 
@@ -143,8 +144,12 @@ void Draw( screen* screen )
       }
     }
   }
-  // DrawTree( screen );
-  DrawBoundedBeams( screen );
+  DrawTree( root, screen );
+  for( int i=0; i<beams.size(); i++ ){
+    PhotonBeam b = beams[i];
+    DrawBeam( screen, b );
+  }
+  // DrawBoundedBeams( screen );
 }
 
 /*Place updates of parameters here*/
@@ -269,6 +274,17 @@ void BoundPhotonBeams(){
 void DrawBoundedBeams( screen* screen ){
   for( int i = 0; i<items.size(); i++ ){
     DrawBoundingBox( screen, items[i] );
+  }
+}
+
+void DrawTree( Node* parent, screen* screen ){
+  AABB box = parent->aabb;
+  DrawBoundingBox( screen, box );
+  if( parent->left != NULL ){
+    DrawTree( parent->left, screen );
+  }
+  if( parent->right != NULL ){
+    DrawTree( parent->right, screen );
   }
 }
 
