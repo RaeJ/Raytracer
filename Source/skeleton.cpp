@@ -99,7 +99,7 @@ void BoundPhotonBeams();
 int main( int argc, char* argv[] )
 {
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 2 );
+  rroot = CastPhotonBeams( 10 );
   BoundPhotonBeams();
 
   cout << "Item size: " << items.size() << "\n";
@@ -167,28 +167,46 @@ void Update()
 }
 
 void BuildTree( Node* parent, vector<AABB> child ){
-  cout << "Child size: " << child.size() << "\n";
   if( child.size() <= 2 ) return;
 
-  vec4 difference = abs( parent->aabb.max - parent->aabb.min );
-  vec4 mid        = parent->aabb.mid;
+  vec4 diff     = abs( parent->aabb.max - parent->aabb.min );
+  vec4 mid      = parent->aabb.mid;
 
   vector<AABB> l;
   vector<AABB> r;
-  if( difference.x > difference.y && difference.x > difference.z ){
+  // TODO: Picking a side at random is probs not the way forward
+  if( ( diff.x > diff.y ) && ( diff.x > diff.z ) ){
     for( int i=0; i<child.size(); i++ ){
       AABB box = child[i];
-      if( box.mid.x < mid.x ) l.push_back( box ); else r.push_back( box );
+      if( box.mid.x < mid.x ){
+        l.push_back( box );
+      }  else if( box.mid.x > mid.x ) {
+        r.push_back( box );
+      } else {
+        if( i % 2 == 0 ) l.push_back( box ); else r.push_back( box );
+      }
     }
-  } else if( difference.y > difference.z ){
+  } else if( diff.y > diff.z ){
     for( int i=0; i<child.size(); i++ ){
       AABB box = child[i];
-      if( box.mid.y <= mid.y ) l.push_back( box ); else r.push_back( box );
+      if( box.mid.y < mid.y ){
+        l.push_back( box );
+      }  else if( box.mid.y > mid.y ){
+        r.push_back( box );
+      } else {
+        if( i % 2 == 0 ) l.push_back( box ); else r.push_back( box );
+      }
     }
   } else {
     for( int i=0; i<child.size(); i++ ){
       AABB box = child[i];
-      if( box.mid.z > mid.z ) l.push_back( box ); else r.push_back( box );
+      if( box.mid.z > mid.z ){
+        l.push_back( box );
+      } else if( box.mid.z < mid.z ){
+        r.push_back( box );
+      } else {
+        if( i % 2 == 0 ) l.push_back( box ); else r.push_back( box );
+      }
     }
   }
 
@@ -208,8 +226,8 @@ void BuildTree( Node* parent, vector<AABB> child ){
     left_child.max = max;
     left_child.mid = ( min + max ) / 2.0f;
     Node *left_node = newNode( left_child );
-    parent -> left = left_node;
-    BuildTree( left_node, l );
+    parent->left = left_node;
+    BuildTree( parent->left, l );
   } else {
     parent -> left = NULL;
   }
@@ -230,8 +248,8 @@ void BuildTree( Node* parent, vector<AABB> child ){
     right_child.max = max;
     right_child.mid = ( min + max ) / 2.0f;
     Node *right_node = newNode( right_child );
-    parent -> right = right_node;
-    BuildTree( right_node, r );
+    parent->right = right_node;
+    BuildTree( parent->right, r );
 
   } else {
     parent -> right = NULL;
@@ -295,7 +313,7 @@ void DrawBeam( screen* screen, PhotonBeam& b ){
   Pixel proj2; Vertex v2; v2.position = b.end;
   VertexShader( v1, proj1 );
   VertexShader( v2, proj2 );
-  DrawLine( screen, v1, v2 );
+  DrawLine( screen, v1, v2, vec3( 1, 1, 1 ) );
 }
 
 AABB CastPhotonBeams( int number ){
@@ -305,7 +323,7 @@ AABB CastPhotonBeams( int number ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin = matrix * light_position;
   vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  float radius = 0.1f;
+  float radius = 0.3f;
 
   for( int i=0; i<number; i++ ){
     Intersection c_i;
@@ -316,7 +334,7 @@ AABB CastPhotonBeams( int number ){
       beam.start  = origin;
       beam.end    = c_i.position;
       beam.offset = 0;
-      beam.radius = 0.4;
+      beam.radius = 0.05;
       beams.push_back( beam );
 
       max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
