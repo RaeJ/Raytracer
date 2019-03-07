@@ -56,6 +56,7 @@ struct Intersection
 
 vector<Triangle> triangles;
 vector<PhotonBeam> beams;
+vector<AABB> items;
 
 float m = std::numeric_limits<float>::max();
 
@@ -70,7 +71,8 @@ std::random_device rd;  //Will be used to obtain a seed for the random number en
 std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 std::normal_distribution<> dis(0.0, 1 );
 
-AABB root;
+AABB rroot;
+Node* root;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -89,12 +91,19 @@ AABB CastPhotonBeams( int number );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b );
 void DrawBoundedBeams( screen* screen );
+void BuildTree( Node* parent, vector<AABB> child );
+void BoundPhotonBeams();
 
 
 int main( int argc, char* argv[] )
 {
   LoadTestModel( triangles );
-  root = CastPhotonBeams( 2 );
+  rroot = CastPhotonBeams( 2 );
+  BoundPhotonBeams();
+
+  cout << "Item size: " << items.size() << "\n";
+  root = newNode( rroot );
+  BuildTree( root, items );
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -134,6 +143,7 @@ void Draw( screen* screen )
       }
     }
   }
+  // DrawTree( screen );
   DrawBoundedBeams( screen );
 }
 
@@ -151,10 +161,81 @@ void Update()
   UserInput();
 }
 
-void DrawBoundedBeams( screen* screen ){
+void BuildTree( Node* parent, vector<AABB> child ){
+  cout << "Child size: " << child.size() << "\n";
+  if( child.size() <= 2 ) return;
+
+  vec4 difference = abs( parent->aabb.max - parent->aabb.min );
+  vec4 mid        = parent->aabb.mid;
+
+  vector<AABB> l;
+  vector<AABB> r;
+  if( difference.x > difference.y && difference.x > difference.z ){
+    for( int i=0; i<child.size(); i++ ){
+      AABB box = child[i];
+      if( box.mid.x < mid.x ) l.push_back( box ); else r.push_back( box );
+    }
+  } else if( difference.y > difference.z ){
+    for( int i=0; i<child.size(); i++ ){
+      AABB box = child[i];
+      if( box.mid.y <= mid.y ) l.push_back( box ); else r.push_back( box );
+    }
+  } else {
+    for( int i=0; i<child.size(); i++ ){
+      AABB box = child[i];
+      if( box.mid.z > mid.z ) l.push_back( box ); else r.push_back( box );
+    }
+  }
+
+  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
+  int l_size = l.size();
+  if( l_size != 0 ){
+    for( int i=0; i<l_size; i++ ){
+      max.x = fmax( l[i].max.x, fmax( l[i].min.x, max.x ) );
+      max.y = fmax( l[i].max.y, fmax( l[i].min.y, max.y ) );
+      max.z = fmin( l[i].max.z, fmin( l[i].min.z, max.z ) );
+      min.x = fmin( l[i].max.x, fmin( l[i].min.x, min.x ) );
+      min.y = fmin( l[i].max.y, fmin( l[i].min.y, min.y ) );
+      min.z = fmax( l[i].max.z, fmax( l[i].min.z, min.z ) );
+    }
+    AABB left_child;
+    left_child.min = min;
+    left_child.max = max;
+    left_child.mid = ( min + max ) / 2.0f;
+    Node *left_node = newNode( left_child );
+    parent -> left = left_node;
+    BuildTree( left_node, l );
+  } else {
+    parent -> left = NULL;
+  }
+
+  min = vec4( m, m, -m, 1 ); max = vec4( -m, -m, m, 1 );
+  int r_size = r.size();
+  if( r_size != 0 ){
+    for( int i=0; i<r_size; i++ ){
+      max.x = fmax( r[i].max.x, fmax( r[i].min.x, max.x ) );
+      max.y = fmax( r[i].max.y, fmax( r[i].min.y, max.y ) );
+      max.z = fmin( r[i].max.z, fmin( r[i].min.z, max.z ) );
+      min.x = fmin( r[i].max.x, fmin( r[i].min.x, min.x ) );
+      min.y = fmin( r[i].max.y, fmin( r[i].min.y, min.y ) );
+      min.z = fmax( r[i].max.z, fmax( r[i].min.z, min.z ) );
+    }
+    AABB right_child;
+    right_child.min = min;
+    right_child.max = max;
+    right_child.mid = ( min + max ) / 2.0f;
+    Node *right_node = newNode( right_child );
+    parent -> right = right_node;
+    BuildTree( right_node, r );
+
+  } else {
+    parent -> right = NULL;
+  }
+}
+
+void BoundPhotonBeams(){
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
-    DrawBeam( screen, b );
 
     vec4 start = b.start;
     vec4 end = b.end;
@@ -162,10 +243,7 @@ void DrawBoundedBeams( screen* screen ){
     vec4 dir = b.start - b.end;
     float j=start.y;
 
-    vec4 min_prev = vec4( start.x,
-                          start.y,
-                          start.z,
-                          1.0f );
+    vec4 min_prev = vec4( start.x, start.y, start.z, 1.0f );
 
     while( j<end.y ){
       AABB beam_box;
@@ -180,11 +258,18 @@ void DrawBoundedBeams( screen* screen ){
       float max_x = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
       float max_z = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
       beam_box.max = vec4( max_x, j, max_z, 1.0f );
+      beam_box.mid = ( beam_box.max + beam_box.min ) / 2.0f;
       min_prev = beam_box.max;
-      DrawBoundingBox( screen, beam_box );
+
+      items.push_back( beam_box );
     }
   }
-  DrawBoundingBox( screen, root );
+}
+
+void DrawBoundedBeams( screen* screen ){
+  for( int i = 0; i<items.size(); i++ ){
+    DrawBoundingBox( screen, items[i] );
+  }
 }
 
 void DrawBeam( screen* screen, PhotonBeam& b ){
@@ -204,7 +289,7 @@ AABB CastPhotonBeams( int number ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin = matrix * light_position;
   vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  float radius = 0.4f;
+  float radius = 0.1f;
 
   for( int i=0; i<number; i++ ){
     Intersection c_i;
@@ -215,15 +300,15 @@ AABB CastPhotonBeams( int number ){
       beam.start  = origin;
       beam.end    = c_i.position;
       beam.offset = 0;
-      beam.radius = 0.01;
+      beam.radius = 0.4;
       beams.push_back( beam );
 
       max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
       max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
       max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
-      min_point.x = fmin( beam.end.x, fmin( beam.start.x, max_point.x ) );
-      min_point.y = fmin( beam.end.y, fmin( beam.start.y, max_point.y ) );
-      min_point.z = fmax( beam.end.z, fmax( beam.start.z, max_point.z ) );
+      min_point.x = fmin( beam.end.x, fmin( beam.start.x, min_point.x ) );
+      min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
+      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
 
     } else {
       cout << "Direction does not terminate\n";
@@ -233,6 +318,7 @@ AABB CastPhotonBeams( int number ){
   AABB root;
   root.min = min_point;
   root.max = max_point;
+  root.mid = ( min_point + max_point ) / 2.0f;
 
   return root;
 }
