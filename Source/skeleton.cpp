@@ -55,8 +55,6 @@ struct Intersection
 /* GLOBAL VARIABLES                                                            */
 
 vector<Triangle> triangles;
-vector<PhotonBeam> beams;
-vector<AABB> items;
 
 float m = std::numeric_limits<float>::max();
 
@@ -78,7 +76,7 @@ Node* root;
 /* FUNCTIONS                                                                   */
 
 void Update();
-void Draw(screen* screen);
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items );
 bool ClosestIntersection(
   vec4 start,
   vec4 dir,
@@ -87,21 +85,25 @@ bool ClosestIntersection(
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
-AABB CastPhotonBeams( int number );
+AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b );
-void DrawBoundedBeams( screen* screen );
+void DrawBoundedBeams( screen* screen, vector<AABB>& items );
 void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<AABB> child );
-void BoundPhotonBeams();
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items );
 
 
 int main( int argc, char* argv[] )
 {
-  LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 10 );
-  BoundPhotonBeams();
+  vector<PhotonBeam> beams;
+  vector<AABB> items;
 
+  LoadTestModel( triangles );
+  rroot = CastPhotonBeams( 35, beams );
+  BoundPhotonBeams( beams, items );
+
+  cout << "Beams size: " << beams.size() << "\n";
   cout << "Item size: " << items.size() << "\n";
   root = newNode( rroot );
   BuildTree( root, items );
@@ -111,7 +113,7 @@ int main( int argc, char* argv[] )
   while( NoQuitMessageSDL() )
     {
       Update();
-      Draw(screen);
+      Draw( screen, beams, items );
       SDL_Renderframe(screen);
     }
 
@@ -121,7 +123,7 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
-void Draw( screen* screen )
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
@@ -256,7 +258,7 @@ void BuildTree( Node* parent, vector<AABB> child ){
   }
 }
 
-void BoundPhotonBeams(){
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items){
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
 
@@ -289,7 +291,7 @@ void BoundPhotonBeams(){
   }
 }
 
-void DrawBoundedBeams( screen* screen ){
+void DrawBoundedBeams( screen* screen, vector<AABB>& items ){
   for( int i = 0; i<items.size(); i++ ){
     DrawBoundingBox( screen, items[i] );
   }
@@ -316,7 +318,7 @@ void DrawBeam( screen* screen, PhotonBeam& b ){
   DrawLine( screen, v1, v2, vec3( 1, 1, 1 ) );
 }
 
-AABB CastPhotonBeams( int number ){
+AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   vec4 min_point = vec4( m, m, -m, 1 );
   vec4 max_point = vec4( -m, -m, m, 1 );
 
