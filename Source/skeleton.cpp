@@ -87,12 +87,13 @@ void UserInput();
 vec3 DirectLight( const Intersection& i );
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
-void DrawBeam( screen* screen, PhotonBeam& b );
+void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour );
 void DrawBoundedBeams( screen* screen, vector<AABB>& items );
 void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<AABB> child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items );
-
+vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir );
+void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 int main( int argc, char* argv[] )
 {
@@ -100,7 +101,7 @@ int main( int argc, char* argv[] )
   vector<AABB> items;
 
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 1000, beams );
+  rroot = CastPhotonBeams( 3, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Item size: " << items.size() << "\n";
@@ -145,11 +146,16 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items )
       }
     }
   }
-  DrawTree( root, screen );
-  for( int i=0; i<beams.size(); i++ ){
-    PhotonBeam b = beams[i];
-    DrawBeam( screen, b );
-  }
+  float x_dir = 42 - ( SCREEN_WIDTH / (float) 2 );
+  float y_dir = 42 - ( SCREEN_HEIGHT / (float) 2);
+  vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
+  vec4 start = matrix * camera;
+  BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
+  // DrawTree( root, screen );
+  // for( int i=0; i<beams.size(); i++ ){
+  //   PhotonBeam b = beams[i];
+  //   DrawBeam( screen, b, vec3(1,1,1) );
+  // }
   // DrawBoundedBeams( screen );
 }
 
@@ -176,7 +182,7 @@ void BuildTree( Node* parent, vector<AABB> child ){
   vector<AABB> l;
   vector<AABB> r;
 
-  // TODO: Picking a side at random is probs not the way forward
+  // TODO: Note, if the photon segment lies on a boundary it is ignored
   if( ( diff.x > diff.y ) && ( diff.x > diff.z ) ){
     for( int i=0; i<child.size(); i++ ){
       AABB box = child[i];
@@ -302,14 +308,14 @@ void DrawTree( Node* parent, screen* screen ){
   }
 }
 
-void DrawBeam( screen* screen, PhotonBeam& b ){
+void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
   mat4 matrix;  TransformationMatrix( matrix );
 
   Pixel proj1; Vertex v1; v1.position = b.start;
   Pixel proj2; Vertex v2; v2.position = b.end;
   VertexShader( v1, proj1 );
   VertexShader( v2, proj2 );
-  DrawLine( screen, v1, v2, vec3( 1, 1, 1 ) );
+  DrawLine( screen, v1, v2, colour );
 }
 
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
@@ -363,6 +369,67 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
   vec4 position( x, centre.y, z, 1.0f );
 
   return( position - origin );
+}
+
+void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
+  AABB box = parent->aabb;
+  DrawBoundingBox( screen, box );
+  vec4 hit = HitBoundingBox( box, start, dir );
+  PhotonBeam b; b.start = start; b.end = hit;
+  DrawBeam( screen, b, vec3(0,0,0) );
+}
+
+vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir ){
+  const int DIMS = 3; int RIGHT=0; int LEFT=0; int MIDDLE=0;
+  int quadrant[DIMS];
+  bool inside = true;
+  float min_b[DIMS] = { box.min.x, box.min.y, box.max.z };
+  float max_b[DIMS] = { box.max.x, box.max.y, box.min.z };
+  float candidate_plane[DIMS];
+  float distances[DIMS];
+  float position[DIMS];
+
+  dir                   = glm::normalize( dir );
+  float origin[DIMS]    = {start.x, start.y, start.z};
+  float direction[DIMS] = {dir.x,   dir.y,   dir.z};
+
+  for ( int i=0; i<DIMS; i++ ){
+    if( origin[i] < min_b[i] ){
+      quadrant[i]        = LEFT;
+      candidate_plane[i] = min_b[i];
+      inside             = false;
+    } else if ( origin[i] > min_b[i] ){
+      quadrant[i]        = RIGHT;
+      candidate_plane[i] = max_b[i];
+      inside             = false;
+    } else {
+      quadrant[i]        = MIDDLE;
+    }
+  }
+  for( int i=0; i<DIMS; i++ ){
+    if( ( quadrant[i] != MIDDLE ) && ( dir[i] != 0 ) ){
+      distances[i] = ( candidate_plane[i] - origin[i] ) / dir[i];
+    } else {
+      distances[i] = -1.0f;
+    }
+  }
+
+  int largest = 0;
+  for( int i=0; i<DIMS; i++ ){
+    if( distances[largest] < distances[i] ){
+      largest = i;
+    }
+  }
+
+  for( int i=0; i<DIMS; i++ ){
+    if ( largest != i ){
+      position[i] = origin[i] + ( distances[largest] * direction[i] );
+    } else {
+      position[i] = candidate_plane[i];
+    }
+  }
+
+  return vec4( position[0], position[1], position[2], 1.0f );
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
