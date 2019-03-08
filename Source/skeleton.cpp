@@ -35,7 +35,7 @@ struct PhotonSeg
 struct Node
 {
   AABB aabb;
-  vector<PhotonSeg> segments;
+  PhotonSeg segments[2];
   struct Node *left;
   struct Node *right;
 };
@@ -47,7 +47,11 @@ struct Node* newNode( AABB data )
 
   // Assign data to this node
   node->aabb = data;
-  node->segments = vector<PhotonSeg>();
+  // node->segments = vector<PhotonSeg>();
+  PhotonSeg init1;  PhotonSeg init2;
+  init1.id = -1;    init2.id = -1;
+  node->segments[0] = init1;
+  node->segments[1] = init2;
 
   // Initialize left and right children as NULL
   node->left = NULL;
@@ -87,7 +91,7 @@ Node* root;
 /* FUNCTIONS                                                                   */
 
 void Update();
-void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg> items );
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items );
 bool ClosestIntersection(
   vec4 start,
   vec4 dir,
@@ -101,8 +105,8 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour );
 void DrawBoundedBeams( screen* screen, vector<AABB> items );
 void DrawTree( Node* parent, screen* screen );
-void BuildTree( Node* parent, vector<PhotonSeg> child );
-void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg> items );
+void BuildTree( Node* parent, vector<PhotonSeg>& child );
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
@@ -112,7 +116,7 @@ int main( int argc, char* argv[] )
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 3, beams );
+  rroot = CastPhotonBeams( 2, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Item size: " << items.size() << "\n";
@@ -134,7 +138,7 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
-void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg> items )
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
@@ -161,8 +165,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg> items )
   float y_dir = 0;
   vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
   vec4 start = matrix * camera;
-  BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
-  // DrawTree( root, screen );
+  // BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
+  DrawTree( root, screen );
   // for( int i=0; i<beams.size(); i++ ){
   //   PhotonBeam b = beams[i];
   //   DrawBeam( screen, b, vec3(1,1,1) );
@@ -184,10 +188,11 @@ void Update()
   UserInput();
 }
 
-void BuildTree( Node* parent, vector<PhotonSeg> child ){
+void BuildTree( Node* parent, vector<PhotonSeg>& child ){
   if( child.size() <= 2 ) {
     for( int i=0; i<child.size(); i++ ){
-      parent->segments.push_back( child[i] );
+      // parent->segments.push_back( child[i] );
+      parent->segments[i] = child[i];
     }
     return;
   }
@@ -206,7 +211,7 @@ void BuildTree( Node* parent, vector<PhotonSeg> child ){
       }  else if( box.mid.x > mid.x ) {
         r.push_back( box );
       } else {
-        parent->segments.push_back( box );
+        // parent->segments.push_back( box );
       }
     }
   } else if( diff.y > diff.z ){
@@ -217,7 +222,7 @@ void BuildTree( Node* parent, vector<PhotonSeg> child ){
       }  else if( box.mid.y > mid.y ){
         r.push_back( box );
       } else {
-        parent->segments.push_back( box );
+        // parent->segments.push_back( box );
       }
     }
   } else {
@@ -228,7 +233,7 @@ void BuildTree( Node* parent, vector<PhotonSeg> child ){
       } else if( box.mid.z < mid.z ){
         r.push_back( box );
       } else {
-        parent->segments.push_back( box );
+        // parent->segments.push_back( box );
       }
     }
   }
@@ -280,7 +285,7 @@ void BuildTree( Node* parent, vector<PhotonSeg> child ){
 
 }
 
-void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg> items ){
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
   int index = 0;
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
@@ -398,44 +403,61 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
 }
 
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
-  Node* left     = parent->left;
-  Node* right    = parent->right;
+  AABB box = parent->aabb;
+  DrawBoundingBox( screen, box );
 
   vec4 hit;
-  if( left != NULL){
-    AABB box_left  = left->aabb;
-    if( HitBoundingBox( box_left, start, dir, hit ) ){
-      PhotonBeam b; b.start = start; b.end = hit;
-      DrawBeam( screen, b, vec3(0,0,0) );
-      // Hits the left box at some point
-      vector<PhotonSeg> segments = left->segments;
-      for( int i=0; i<segments.size(); i++ ){
-        // Increase the radiance based on the PhotonBeam
-        current += 0.01f*vec3( 1, 1, 1 );
+  if( HitBoundingBox( box, start, dir, hit ) ){
+    PhotonBeam b; b.start = start; b.end = hit;
+    DrawBeam( screen, b, vec3(0,0,0) );
+
+    Node* left     = parent->left;
+    Node* right    = parent->right;
+
+    if( left != NULL){
+      AABB box_left  = left->aabb;
+      DrawBoundingBox( screen, box_left );
+      if( HitBoundingBox( box_left, start, dir, hit ) ){
+        // Hits the left box at some point
+        PhotonSeg segments[2];
+        segments[0] = left->segments[0];
+        segments[1] = left->segments[1];
+        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+          PhotonSeg a = segments[i];
+          if( a.id != -1 ){
+            // Increase the radiance based on the PhotonBeam
+            current += 0.01f*vec3( 1, 1, 1 );
+          }
+        }
+        if( left->left != NULL || left->right != NULL ){
+          BeamRadiance( screen, start, dir, left, current );
+        }
       }
-      if( left->left != NULL || left->right != NULL ){
-        BeamRadiance( screen, start, dir, left, current );
+    } else {
+      cout << "Left is null\n";
+    }
+
+    if( right != NULL ){
+      AABB box_right = right->aabb;
+      DrawBoundingBox( screen, box_right );
+      if( HitBoundingBox( box_right, start, dir, hit ) ){
+        // Hits the right box at some point
+        PhotonSeg segments[2];
+        segments[0] = right->segments[0];
+        segments[1] = right->segments[1];
+        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+          PhotonSeg a = segments[i];
+          if( a.id != -1 ){
+            // Increase the radiance based on the PhotonBeam
+            current += 0.01f*vec3( 1, 1, 1 );
+          }
+        }
+        if( right->left != NULL || right->right != NULL ){
+          BeamRadiance( screen, start, dir, right, current );
+        }
       }
     }
   }
-
-  if( right != NULL ){
-    AABB box_right = right->aabb;
-    if( HitBoundingBox( box_right, start, dir, hit ) ){
-      PhotonBeam b; b.start = start; b.end = hit;
-      DrawBeam( screen, b, vec3(0,0,0) );
-      // Hits the right box at some point
-      vector<PhotonSeg> segments = right->segments;
-      for( int i=0; i<segments.size(); i++ ){
-        // Increase the radiance based on the PhotonBeam
-        current += 0.01f*vec3( 1, 1, 1 );
-      }
-      if( right->left != NULL || right->right != NULL ){
-        BeamRadiance( screen, start, dir, right, current );
-      }
-    }
-  }
-
 }
 
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
