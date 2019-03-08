@@ -116,7 +116,7 @@ int main( int argc, char* argv[] )
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 2, beams );
+  rroot = CastPhotonBeams( 10, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Item size: " << items.size() << "\n";
@@ -165,8 +165,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   float y_dir = 0;
   vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
   vec4 start = matrix * camera;
-  // BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
-  DrawTree( root, screen );
+  BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
+  // DrawTree( root, screen );
   // for( int i=0; i<beams.size(); i++ ){
   //   PhotonBeam b = beams[i];
   //   DrawBeam( screen, b, vec3(1,1,1) );
@@ -212,6 +212,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // parent->segments.push_back( box );
+        // cout << "Issue 1. \n";
       }
     }
   } else if( diff.y > diff.z ){
@@ -223,6 +224,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // parent->segments.push_back( box );
+        // cout << "Issue 2. \n";
       }
     }
   } else {
@@ -234,6 +236,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // parent->segments.push_back( box );
+        // cout << "Issue 3. \n";
       }
     }
   }
