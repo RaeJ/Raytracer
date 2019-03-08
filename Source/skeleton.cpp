@@ -116,7 +116,7 @@ int main( int argc, char* argv[] )
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 100, beams );
+  rroot = CastPhotonBeams( 1000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -143,20 +143,6 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
-
-  // // Light gathering stage
-  // for( int x = 0; x < SCREEN_WIDTH; x++ ) {
-  //   for( int y = 0; y < SCREEN_HEIGHT; y++ ) {
-  //     float x_dir = x - ( SCREEN_WIDTH / (float) 2 );
-  //     float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
-  //
-  //     vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-  //     vec4 start = matrix * camera;
-  //     // vec4 start = camera;
-  //     BeamRadiance( start, direction, root, vec3(0,0,0) );
-  //
-  //   }
-  // }
 
   // Drawing stage
   for( int x = 0; x < SCREEN_WIDTH; x++ ) {
@@ -228,6 +214,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       } else {
         // parent->segments.push_back( box );
         // cout << "Issue 1. \n";
+        // parent->segments[i%2] = child[i];
       }
     }
   } else if( diff.y > diff.z ){
@@ -240,6 +227,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       } else {
         // parent->segments.push_back( box );
         // cout << "Issue 2. \n";
+        // parent->segments[i%2] = child[i];
       }
     }
   } else {
@@ -252,6 +240,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       } else {
         // parent->segments.push_back( box );
         // cout << "Issue 3. \n";
+        // parent->segments[i%2] = child[i];
       }
     }
   }
