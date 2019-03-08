@@ -23,9 +23,19 @@ struct PhotonBeam
   float radius;
 };
 
+struct PhotonSeg
+{
+  vec4 start;
+  vec4 end;
+  vec4 mid;
+  float radius;
+  int id;
+};
+
 struct Node
 {
   AABB aabb;
+  vector<PhotonSeg> segments;
   struct Node *left;
   struct Node *right;
 };
@@ -37,6 +47,7 @@ struct Node* newNode( AABB data )
 
   // Assign data to this node
   node->aabb = data;
+  node->segments = vector<PhotonSeg>();
 
   // Initialize left and right children as NULL
   node->left = NULL;
@@ -76,7 +87,7 @@ Node* root;
 /* FUNCTIONS                                                                   */
 
 void Update();
-void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items );
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg> items );
 bool ClosestIntersection(
   vec4 start,
   vec4 dir,
@@ -88,17 +99,17 @@ vec3 DirectLight( const Intersection& i );
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour );
-void DrawBoundedBeams( screen* screen, vector<AABB>& items );
+void DrawBoundedBeams( screen* screen, vector<AABB> items );
 void DrawTree( Node* parent, screen* screen );
-void BuildTree( Node* parent, vector<AABB> child );
-void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items );
+void BuildTree( Node* parent, vector<PhotonSeg> child );
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg> items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 int main( int argc, char* argv[] )
 {
   vector<PhotonBeam> beams;
-  vector<AABB> items;
+  vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
   rroot = CastPhotonBeams( 3, beams );
@@ -123,7 +134,7 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
-void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items )
+void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg> items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
@@ -173,41 +184,51 @@ void Update()
   UserInput();
 }
 
-void BuildTree( Node* parent, vector<AABB> child ){
-  if( child.size() <= 2 ) return;
-
+void BuildTree( Node* parent, vector<PhotonSeg> child ){
+  if( child.size() <= 2 ) {
+    for( int i=0; i<child.size(); i++ ){
+      parent->segments.push_back( child[i] );
+    }
+    return;
+  }
   vec4 diff     = abs( parent->aabb.max - parent->aabb.min );
   vec4 mid      = parent->aabb.mid;
 
-  vector<AABB> l;
-  vector<AABB> r;
+  vector<PhotonSeg> l;
+  vector<PhotonSeg> r;
 
   // TODO: Note, if the photon segment lies on a boundary it is ignored
   if( ( diff.x > diff.y ) && ( diff.x > diff.z ) ){
     for( int i=0; i<child.size(); i++ ){
-      AABB box = child[i];
+      PhotonSeg box = child[i];
       if( box.mid.x < mid.x ){
         l.push_back( box );
       }  else if( box.mid.x > mid.x ) {
         r.push_back( box );
+      } else {
+        parent->segments.push_back( box );
       }
     }
   } else if( diff.y > diff.z ){
     for( int i=0; i<child.size(); i++ ){
-      AABB box = child[i];
+      PhotonSeg box = child[i];
       if( box.mid.y < mid.y ){
         l.push_back( box );
       }  else if( box.mid.y > mid.y ){
         r.push_back( box );
+      } else {
+        parent->segments.push_back( box );
       }
     }
   } else {
     for( int i=0; i<child.size(); i++ ){
-      AABB box = child[i];
+      PhotonSeg box = child[i];
       if( box.mid.z > mid.z ){
         l.push_back( box );
       } else if( box.mid.z < mid.z ){
         r.push_back( box );
+      } else {
+        parent->segments.push_back( box );
       }
     }
   }
@@ -216,12 +237,12 @@ void BuildTree( Node* parent, vector<AABB> child ){
   int l_size = l.size();
   if( l_size != 0 ){
     for( int i=0; i<l_size; i++ ){
-      max.x = fmax( l[i].max.x, fmax( l[i].min.x, max.x ) );
-      max.y = fmax( l[i].max.y, fmax( l[i].min.y, max.y ) );
-      max.z = fmin( l[i].max.z, fmin( l[i].min.z, max.z ) );
-      min.x = fmin( l[i].max.x, fmin( l[i].min.x, min.x ) );
-      min.y = fmin( l[i].max.y, fmin( l[i].min.y, min.y ) );
-      min.z = fmax( l[i].max.z, fmax( l[i].min.z, min.z ) );
+      max.x = fmax( l[i].start.x, fmax( l[i].end.x, max.x ) );
+      max.y = fmax( l[i].start.y, fmax( l[i].end.y, max.y ) );
+      max.z = fmin( l[i].start.z, fmin( l[i].end.z, max.z ) );
+      min.x = fmin( l[i].start.x, fmin( l[i].end.x, min.x ) );
+      min.y = fmin( l[i].start.y, fmin( l[i].end.y, min.y ) );
+      min.z = fmax( l[i].start.z, fmax( l[i].end.z, min.z ) );
     }
     AABB left_child;
     left_child.min = min;
@@ -238,12 +259,12 @@ void BuildTree( Node* parent, vector<AABB> child ){
   int r_size = r.size();
   if( r_size != 0 ){
     for( int i=0; i<r_size; i++ ){
-      max.x = fmax( r[i].max.x, fmax( r[i].min.x, max.x ) );
-      max.y = fmax( r[i].max.y, fmax( r[i].min.y, max.y ) );
-      max.z = fmin( r[i].max.z, fmin( r[i].min.z, max.z ) );
-      min.x = fmin( r[i].max.x, fmin( r[i].min.x, min.x ) );
-      min.y = fmin( r[i].max.y, fmin( r[i].min.y, min.y ) );
-      min.z = fmax( r[i].max.z, fmax( r[i].min.z, min.z ) );
+      max.x = fmax( r[i].end.x, fmax( r[i].start.x, max.x ) );
+      max.y = fmax( r[i].end.y, fmax( r[i].start.y, max.y ) );
+      max.z = fmin( r[i].end.z, fmin( r[i].start.z, max.z ) );
+      min.x = fmin( r[i].end.x, fmin( r[i].start.x, min.x ) );
+      min.y = fmin( r[i].end.y, fmin( r[i].start.y, min.y ) );
+      min.z = fmax( r[i].end.z, fmax( r[i].start.z, min.z ) );
     }
     AABB right_child;
     right_child.min = min;
@@ -259,7 +280,8 @@ void BuildTree( Node* parent, vector<AABB> child ){
 
 }
 
-void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items){
+void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg> items ){
+  int index = 0;
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
 
@@ -271,7 +293,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items){
 
     vec4 min_prev = vec4( start.x, start.y, start.z, 1.0f );
     while( j<end.y ){
-      AABB beam_box;
+      PhotonSeg beam_seg;
 
       if( j + b.radius > end.y ){
         j = end.y;
@@ -279,14 +301,16 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items){
         j = j + b.radius;
       }
 
-      beam_box.min = min_prev;
-      float max_x = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
-      float max_z = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
-      beam_box.max = vec4( max_x, j, max_z, 1.0f );
-      beam_box.mid = ( beam_box.max + beam_box.min ) / 2.0f;
-      min_prev = beam_box.max;
+      beam_seg.id    = index;
+      beam_seg.start = min_prev;
+      float max_x    = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
+      float max_z    = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
+      beam_seg.end   = vec4( max_x, j, max_z, 1.0f );
+      beam_seg.mid   = ( beam_seg.start + beam_seg.end ) / 2.0f;
+      min_prev       = beam_seg.end;
 
-      items.push_back( beam_box );
+      items.push_back( beam_seg );
+      index++;
     }
   }
 }
