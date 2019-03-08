@@ -92,7 +92,7 @@ void DrawBoundedBeams( screen* screen, vector<AABB>& items );
 void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<AABB> child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<AABB>& items );
-vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir );
+bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 int main( int argc, char* argv[] )
@@ -146,8 +146,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items )
       }
     }
   }
-  float x_dir = 42 - ( SCREEN_WIDTH / (float) 2 );
-  float y_dir = 42 - ( SCREEN_HEIGHT / (float) 2);
+  float x_dir = 0;
+  float y_dir = 0;
   vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
   vec4 start = matrix * camera;
   BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
@@ -156,7 +156,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<AABB> items )
   //   PhotonBeam b = beams[i];
   //   DrawBeam( screen, b, vec3(1,1,1) );
   // }
-  // DrawBoundedBeams( screen );
+  // DrawBoundedBeams( screen, items );
 }
 
 /*Place updates of parameters here*/
@@ -316,6 +316,8 @@ void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
   VertexShader( v1, proj1 );
   VertexShader( v2, proj2 );
   DrawLine( screen, v1, v2, colour );
+  PixelShader( screen, proj1.x, proj1.y, vec3(0,1,0) );
+  PixelShader( screen, proj2.x, proj2.y, vec3(1,0,0) );
 }
 
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
@@ -373,13 +375,18 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
 
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
   AABB box = parent->aabb;
+  mat4 matrix;  TransformationMatrix( matrix );
   DrawBoundingBox( screen, box );
-  vec4 hit = HitBoundingBox( box, start, dir );
-  PhotonBeam b; b.start = start; b.end = hit;
-  DrawBeam( screen, b, vec3(0,0,0) );
+  vec4 hit;
+  if( HitBoundingBox( box, start, dir, hit ) ){
+    PhotonBeam b; b.start = start; b.end = hit;
+    // PhotonBeam b; b.start = start; b.end = glm::normalize(dir) + start;
+    DrawBeam( screen, b, vec3(0,0,0) );
+  }
+
 }
 
-vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir ){
+bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   const int DIMS = 3; int RIGHT=0; int LEFT=0; int MIDDLE=0;
   int quadrant[DIMS];
   bool inside = true;
@@ -398,7 +405,7 @@ vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir ){
       quadrant[i]        = LEFT;
       candidate_plane[i] = min_b[i];
       inside             = false;
-    } else if ( origin[i] > min_b[i] ){
+    } else if ( origin[i] > max_b[i] ){
       quadrant[i]        = RIGHT;
       candidate_plane[i] = max_b[i];
       inside             = false;
@@ -406,9 +413,14 @@ vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir ){
       quadrant[i]        = MIDDLE;
     }
   }
+  if( inside ){
+    hit = vec4( start.x, start.y, start.z, 1.0f );
+    return true;
+  }
+
   for( int i=0; i<DIMS; i++ ){
-    if( ( quadrant[i] != MIDDLE ) && ( dir[i] != 0 ) ){
-      distances[i] = ( candidate_plane[i] - origin[i] ) / dir[i];
+    if(  direction[i] != 0 ){
+      distances[i] = ( candidate_plane[i] - origin[i] ) / direction[i];
     } else {
       distances[i] = -1.0f;
     }
@@ -421,15 +433,20 @@ vec4 HitBoundingBox( AABB box, vec4 start, vec4 dir ){
     }
   }
 
+  if( distances[largest] < 0 ) return false;
   for( int i=0; i<DIMS; i++ ){
     if ( largest != i ){
       position[i] = origin[i] + ( distances[largest] * direction[i] );
+      if (position[i] < min_b[i] || position[i] > max_b[i]){
+				return false;
+      }
     } else {
       position[i] = candidate_plane[i];
     }
   }
 
-  return vec4( position[0], position[1], position[2], 1.0f );
+  hit = vec4( position[0], position[1], position[2], 1.0f );
+  return true;
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir,
