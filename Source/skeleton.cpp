@@ -398,14 +398,42 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
 }
 
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
-  AABB box = parent->aabb;
-  mat4 matrix;  TransformationMatrix( matrix );
-  DrawBoundingBox( screen, box );
+  Node* left     = parent->left;
+  Node* right    = parent->right;
+
   vec4 hit;
-  if( HitBoundingBox( box, start, dir, hit ) ){
-    PhotonBeam b; b.start = start; b.end = hit;
-    // PhotonBeam b; b.start = start; b.end = glm::normalize(dir) + start;
-    DrawBeam( screen, b, vec3(0,0,0) );
+  if( left != NULL){
+    AABB box_left  = left->aabb;
+    if( HitBoundingBox( box_left, start, dir, hit ) ){
+      PhotonBeam b; b.start = start; b.end = hit;
+      DrawBeam( screen, b, vec3(0,0,0) );
+      // Hits the left box at some point
+      vector<PhotonSeg> segments = left->segments;
+      for( int i=0; i<segments.size(); i++ ){
+        // Increase the radiance based on the PhotonBeam
+        current += 0.01f*vec3( 1, 1, 1 );
+      }
+      if( left->left != NULL || left->right != NULL ){
+        BeamRadiance( screen, start, dir, left, current );
+      }
+    }
+  }
+
+  if( right != NULL ){
+    AABB box_right = right->aabb;
+    if( HitBoundingBox( box_right, start, dir, hit ) ){
+      PhotonBeam b; b.start = start; b.end = hit;
+      DrawBeam( screen, b, vec3(0,0,0) );
+      // Hits the right box at some point
+      vector<PhotonSeg> segments = right->segments;
+      for( int i=0; i<segments.size(); i++ ){
+        // Increase the radiance based on the PhotonBeam
+        current += 0.01f*vec3( 1, 1, 1 );
+      }
+      if( right->left != NULL || right->right != NULL ){
+        BeamRadiance( screen, start, dir, right, current );
+      }
+    }
   }
 
 }
