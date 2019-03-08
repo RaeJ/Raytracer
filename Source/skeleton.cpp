@@ -108,7 +108,7 @@ void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<PhotonSeg>& child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
-void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
+void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current );
 
 int main( int argc, char* argv[] )
 {
@@ -116,10 +116,10 @@ int main( int argc, char* argv[] )
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
-  rroot = CastPhotonBeams( 10, beams );
+  rroot = CastPhotonBeams( 100, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
-  cout << "Item size: " << items.size() << "\n";
+  cout << "Segment size: " << items.size() << "\n";
   root = newNode( rroot );
   BuildTree( root, items );
 
@@ -144,6 +144,21 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
+  // // Light gathering stage
+  // for( int x = 0; x < SCREEN_WIDTH; x++ ) {
+  //   for( int y = 0; y < SCREEN_HEIGHT; y++ ) {
+  //     float x_dir = x - ( SCREEN_WIDTH / (float) 2 );
+  //     float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
+  //
+  //     vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
+  //     vec4 start = matrix * camera;
+  //     // vec4 start = camera;
+  //     BeamRadiance( start, direction, root, vec3(0,0,0) );
+  //
+  //   }
+  // }
+
+  // Drawing stage
   for( int x = 0; x < SCREEN_WIDTH; x++ ) {
     for( int y = 0; y < SCREEN_HEIGHT; y++ ) {
       float x_dir = x - ( SCREEN_WIDTH / (float) 2 );
@@ -154,18 +169,18 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       // vec4 start = camera;
       Intersection c_i;
 
+      vec3 current = vec3( 0, 0, 0 );
+      BeamRadiance( start, direction, root, current );
+
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
         vec3 power = DirectLight( c_i );
-        PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
+        // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
+        PutPixelSDL( screen, x, y, current * close.colour );
       }
     }
   }
-  float x_dir = 0;
-  float y_dir = 0;
-  vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-  vec4 start = matrix * camera;
-  BeamRadiance( screen, start, direction, root, vec3(0,0,0) );
+
   // DrawTree( root, screen );
   // for( int i=0; i<beams.size(); i++ ){
   //   PhotonBeam b = beams[i];
@@ -309,7 +324,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
         j = j + b.radius;
       }
 
-      beam_seg.id    = index;
+      beam_seg.id    = i;
       beam_seg.start = min_prev;
       float max_x    = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
       float max_z    = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
@@ -405,59 +420,50 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
   return( position - origin );
 }
 
-void BeamRadiance( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
-  AABB box = parent->aabb;
-  DrawBoundingBox( screen, box );
-
+void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current ){
   vec4 hit;
-  if( HitBoundingBox( box, start, dir, hit ) ){
-    PhotonBeam b; b.start = start; b.end = hit;
-    DrawBeam( screen, b, vec3(0,0,0) );
 
-    Node* left     = parent->left;
-    Node* right    = parent->right;
+  Node* left     = parent->left;
+  Node* right    = parent->right;
 
-    if( left != NULL){
-      AABB box_left  = left->aabb;
-      DrawBoundingBox( screen, box_left );
-      if( HitBoundingBox( box_left, start, dir, hit ) ){
-        // Hits the left box at some point
-        PhotonSeg segments[2];
-        segments[0] = left->segments[0];
-        segments[1] = left->segments[1];
-        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg a = segments[i];
-          if( a.id != -1 ){
-            // Increase the radiance based on the PhotonBeam
-            current += 0.01f*vec3( 1, 1, 1 );
-          }
-        }
-        if( left->left != NULL || left->right != NULL ){
-          BeamRadiance( screen, start, dir, left, current );
+  if( left != NULL){
+    AABB box_left  = left->aabb;
+    if( HitBoundingBox( box_left, start, dir, hit ) ){
+      // Hits the left box at some point
+      PhotonSeg segments[2];
+      segments[0] = left->segments[0];
+      segments[1] = left->segments[1];
+      for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+        PhotonSeg a = segments[i];
+        if( a.id != -1 ){
+          // Increase the radiance based on the PhotonBeam
+          current += 0.7f*vec3( 1, 1, 1 );
         }
       }
-    } else {
-      cout << "Left is null\n";
+      if( left->left != NULL || left->right != NULL ){
+        BeamRadiance( start, dir, left, current );
+      }
     }
+  } else {
+    cout << "Left is null\n";
+  }
 
-    if( right != NULL ){
-      AABB box_right = right->aabb;
-      DrawBoundingBox( screen, box_right );
-      if( HitBoundingBox( box_right, start, dir, hit ) ){
-        // Hits the right box at some point
-        PhotonSeg segments[2];
-        segments[0] = right->segments[0];
-        segments[1] = right->segments[1];
-        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg a = segments[i];
-          if( a.id != -1 ){
-            // Increase the radiance based on the PhotonBeam
-            current += 0.01f*vec3( 1, 1, 1 );
-          }
+  if( right != NULL ){
+    AABB box_right = right->aabb;
+    if( HitBoundingBox( box_right, start, dir, hit ) ){
+      // Hits the right box at some point
+      PhotonSeg segments[2];
+      segments[0] = right->segments[0];
+      segments[1] = right->segments[1];
+      for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+        PhotonSeg a = segments[i];
+        if( a.id != -1 ){
+          // Increase the radiance based on the PhotonBeam
+          current += 0.7f*vec3( 1, 1, 1 );
         }
-        if( right->left != NULL || right->right != NULL ){
-          BeamRadiance( screen, start, dir, right, current );
-        }
+      }
+      if( right->left != NULL || right->right != NULL ){
+        BeamRadiance( start, dir, right, current );
       }
     }
   }
