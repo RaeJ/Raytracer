@@ -153,7 +153,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 50000, beams );
+  rroot = CastPhotonBeams( 500, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -188,25 +188,26 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   // }
 
   // Drawing stage
-  for( int x = 0; x < SCREEN_WIDTH; x++ ) {
-    for( int y = 0; y < SCREEN_HEIGHT; y++ ) {
-      float x_dir = x - ( SCREEN_WIDTH / (float) 2 );
-      float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
+  for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
+    for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
+      vec3 current = vec3( 0, 0, 0 );
+      for( int i = 0; i<SSAA; i++ ){
+        for( int j = 0; j<SSAA; j++ ){
+          float x_dir = ( x + i ) - ( (SCREEN_WIDTH * SSAA) / (float) 2 );
+          float y_dir = ( y + j ) - ( (SCREEN_HEIGHT * SSAA) / (float) 2);
 
-      vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-      vec4 start = vec4( 0, 0, 0, 1 );
-      Intersection c_i;
+          vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
+          vec4 start = vec4( 0, 0, 0, 1 );
+          Intersection c_i;
 
+          if( ClosestIntersection( start, direction, c_i ) ){
+            Triangle close = triangles[c_i.index];
+            BeamRadiance( start, direction, c_i.position, root, current, beams );
 
-
-      if( ClosestIntersection( start, direction, c_i ) ){
-        Triangle close = triangles[c_i.index];
-
-        vec3 current = vec3( 0, 0, 0 );
-        BeamRadiance( start, direction, c_i.position, root, current, beams );
-
-        if( current.x > 0.001 ){
-          PutPixelSDL( screen, x, y, current * close.colour );
+            if( current.x > 0.001 ){
+              PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour );
+            }
+          }
         }
       }
     }
