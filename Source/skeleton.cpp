@@ -12,6 +12,8 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
+#define BOUNCES 7
+
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
 
@@ -21,6 +23,7 @@ struct PhotonBeam
   vec4 end;
   float offset;
   float radius;
+  vec3 energy = 0.1f * vec3( 1, 1, 1 );
 };
 
 struct PhotonSeg
@@ -76,9 +79,8 @@ float m = std::numeric_limits<float>::max();
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
-vec4 light_position(0,-0.5,-0.7,1);
-vec3 light_power = 0.5f * vec3( 1, 1, 1 );
-// vec3 light_power = 14.f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.8,-0.7,1);
+vec3 light_power = 14.f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -113,7 +115,21 @@ void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<PhotonSeg>& child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
-void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<PhotonBeam>& beams );
+void BeamRadiance( vec4 start,
+                   vec4 dir,
+                   Node* parent,
+                   vec3& current,
+                   vector<PhotonBeam>& beams
+                 );
+void CastBeam( int bounce,
+               vec4 origin,
+               vec4 centre,
+               float radius,
+               vec4& min_point,
+               vec4& max_point,
+               glm::mat4& matrix,
+               vector<PhotonBeam>& beams
+             );
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
@@ -136,7 +152,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 1000, beams );
+  rroot = CastPhotonBeams( 100, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -165,10 +181,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
-  // for( int i=0; i<beams.size(); i++ ){
-  //   PhotonBeam b = beams[i];
-  //   DrawBeam( screen, b, vec3( 0.15f, 0.75f, 0.75f ) );
-  // }
+  for( int i=0; i<beams.size(); i++ ){
+	    PhotonBeam b = beams[i];
+	    DrawBeam( screen, b, vec3( 0.15f, 0.75f, 0.75f ) );
+  }
 
   // Drawing stage
   for( int x = 0; x < SCREEN_WIDTH; x++ ) {
@@ -177,8 +193,6 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
 
       vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-      // vec4 start = matrix * camera;
-      // vec4 start = camera;
       vec4 start = vec4( 0, 0, 0, 1 );
       Intersection c_i;
 
@@ -187,11 +201,11 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
-        vec3 power = DirectLight( c_i );
+        // vec3 power = DirectLight( c_i );
         // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
-        if( current.x > 0.001 ){
-          PutPixelSDL( screen, x, y, current * close.colour );
-        }
+        // if( current.x > 0.001 ){
+        //   PutPixelSDL( screen, x, y, current * close.colour );
+        // }
       }
     }
     // float x_dir = 0;
@@ -343,12 +357,12 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
 
       beam_seg.radius = b.radius;
       beam_seg.id     = i;
-      beam_seg.start  = min_prev;
+      beam_seg.start  = vec4( min_prev.x - b.radius, min_prev.y, min_prev.z + b.radius, 1.0f );
       float max_x     = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
       float max_z     = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
-      beam_seg.end    = vec4( max_x, j, max_z, 1.0f );
+      beam_seg.end    = vec4( max_x + b.radius, j, max_z - b.radius, 1.0f );
       beam_seg.mid    = ( beam_seg.start + beam_seg.end ) / 2.0f;
-      min_prev        = beam_seg.end;
+      min_prev        = vec4( max_x, j, max_z, 1.0f );
 
       items.push_back( beam_seg );
       index++;
@@ -393,27 +407,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   float radius = 0.4f;
 
   for( int i=0; i<number; i++ ){
-    Intersection c_i;
-    vec4 direction = FindDirection( origin, centre, radius );
-    direction = glm::normalize( direction );
-    if( ClosestIntersection( origin, direction, c_i ) ){
-      PhotonBeam beam;
-      beam.start  = origin;
-      beam.end    = c_i.position;
-      beam.offset = 0;
-      beam.radius = 0.01;
-      beams.push_back( beam );
-
-      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
-      max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
-      max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
-      min_point.x = fmin( beam.end.x, fmin( beam.start.x, min_point.x ) );
-      min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
-      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
-
-    } else {
-      cout << "Direction does not terminate\n";
-    }
+    CastBeam( 0, origin, centre, radius, min_point, max_point, matrix, beams );
   }
 
   AABB root;
@@ -422,6 +416,35 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   root.mid = ( min_point + max_point ) / 2.0f;
 
   return root;
+}
+
+void CastBeam( int bounce, vec4 origin, vec4 centre, float radius,
+               vec4& min_point, vec4& max_point, glm::mat4& matrix,
+               vector<PhotonBeam>& beams ){
+   Intersection c_i;
+   vec4 direction = FindDirection( origin, centre, radius );
+   direction = glm::normalize( direction );
+   if( ClosestIntersection( origin, direction, c_i ) ){
+     PhotonBeam beam;
+     // TODO: Work out why the offset is not working as expected
+     beam.offset = fmod( dis( gen ), 1 ) * 0.01;
+     beam.radius = 0.01;
+
+     beam.start  = origin + beam.offset;
+     beam.end    = c_i.position - beam.offset;
+
+     beams.push_back( beam );
+
+     max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
+     max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
+     max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
+     min_point.x = fmin( beam.end.x, fmin( beam.start.x, min_point.x ) );
+     min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
+     min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
+
+   } else {
+     cout << "Direction does not terminate\n";
+   }
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
@@ -465,7 +488,17 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<Pho
           // Increase the radiance based on the PhotonBeam
           float strength_p = Transmittance( light_location, a.mid );
           float strength_c = Transmittance( start, a.mid );
-          current += ( light_power * strength_p ) * strength_c;
+
+          // (L1)    r = a + bs,
+          // (L2)    r = c + dt,
+          // g = (a-c)·(b×d) / |b×d|
+          vec3 _b         = glm::normalize( vec3( dir ) );
+          vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
+          vec3 cross      = glm::cross( _b, _d );
+          float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+
+          float strength_r= a.radius / distance;
+          current += beams[i].energy * strength_p * strength_c * strength_r;
         }
       }
       if( left->left != NULL || left->right != NULL ){
@@ -487,7 +520,17 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<Pho
           // Increase the radiance based on the PhotonBeam
           float strength_p = Transmittance( light_location, a.mid );
           float strength_c = Transmittance( start, a.mid );
-          current += ( light_power * strength_p ) * strength_c;
+
+          // (L1)    r = a + bs,
+          // (L2)    r = c + dt,
+          // g = (a-c)·(b×d) / |b×d|
+          vec3 _b         = glm::normalize( vec3( dir ) );
+          vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
+          vec3 cross      = glm::cross( _b, _d );
+          float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+
+          float strength_r= a.radius / distance;
+          current += beams[i].energy * strength_p * strength_c * strength_r;
         }
       }
       if( right->left != NULL || right->right != NULL ){
