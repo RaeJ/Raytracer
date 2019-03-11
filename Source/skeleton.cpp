@@ -23,7 +23,7 @@ struct PhotonBeam
   vec4 end;
   float offset;
   float radius;
-  vec3 energy = 0.1f * vec3( 1, 1, 1 );
+  vec3 energy = vec3( 0, 0, 0 );
 };
 
 struct PhotonSeg
@@ -80,7 +80,7 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 14.f * vec3( 1, 1, 1 );
+vec3 light_power = 0.1f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -122,14 +122,14 @@ void BeamRadiance( vec4 start,
                    vector<PhotonBeam>& beams
                  );
 void CastBeam( int bounce,
+               vec3 energy,
                vec4 origin,
-               vec4 centre,
-               float radius,
+               vec4 direction,
                vec4& min_point,
                vec4& max_point,
-               glm::mat4& matrix,
                vector<PhotonBeam>& beams
              );
+float Transmittance( vec4 start, vec4 hit );
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
@@ -152,7 +152,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 100, beams );
+  rroot = CastPhotonBeams( 1000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -181,10 +181,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
-  for( int i=0; i<beams.size(); i++ ){
-	    PhotonBeam b = beams[i];
-	    DrawBeam( screen, b, vec3( 0.15f, 0.75f, 0.75f ) );
-  }
+  // for( int i=0; i<beams.size(); i++ ){
+	//     PhotonBeam b = beams[i];
+	//     DrawBeam( screen, b, vec3( 0.15f, 0.75f, 0.75f ) );
+  // }
 
   // Drawing stage
   for( int x = 0; x < SCREEN_WIDTH; x++ ) {
@@ -203,9 +203,9 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
         Triangle close = triangles[c_i.index];
         // vec3 power = DirectLight( c_i );
         // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
-        // if( current.x > 0.001 ){
-        //   PutPixelSDL( screen, x, y, current * close.colour );
-        // }
+        if( current.x > 0.001 ){
+          PutPixelSDL( screen, x, y, current * close.colour );
+        }
       }
     }
     // float x_dir = 0;
@@ -402,12 +402,17 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   vec4 max_point = vec4( -m, -m, m, 1 );
 
   mat4 matrix;  TransformationMatrix( matrix );
-  vec4 origin = matrix * light_position;
-  vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  float radius = 0.4f;
+  vec4 origin    = matrix * light_position;
+  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  float radius   = 0.4f;
+
+  vec3 energy    = light_power;
 
   for( int i=0; i<number; i++ ){
-    CastBeam( 0, origin, centre, radius, min_point, max_point, matrix, beams );
+    vec4 direction = FindDirection( origin, centre, radius );
+    direction = glm::normalize( direction );
+
+    CastBeam( 0, energy, origin, direction, min_point, max_point, beams );
   }
 
   AABB root;
@@ -418,20 +423,19 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   return root;
 }
 
-void CastBeam( int bounce, vec4 origin, vec4 centre, float radius,
-               vec4& min_point, vec4& max_point, glm::mat4& matrix,
-               vector<PhotonBeam>& beams ){
-   Intersection c_i;
-   vec4 direction = FindDirection( origin, centre, radius );
-   direction = glm::normalize( direction );
-   if( ClosestIntersection( origin, direction, c_i ) ){
+void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
+               vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams ){
+
+   Intersection hit;
+   if( ClosestIntersection( origin, direction, hit ) ){
      PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
      beam.offset = fmod( dis( gen ), 1 ) * 0.01;
      beam.radius = 0.01;
+     beam.energy = energy;
 
      beam.start  = origin + beam.offset;
-     beam.end    = c_i.position - beam.offset;
+     beam.end    = hit.position - beam.offset;
 
      beams.push_back( beam );
 
@@ -442,9 +446,23 @@ void CastBeam( int bounce, vec4 origin, vec4 centre, float radius,
      min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
 
+     if( bounce < BOUNCES ){
+       int num               = bounce + 1;
+       Triangle hit_triangle = triangles[hit.index];
+       vec4 normal           = hit_triangle.normal;
+       vec4 incident         = hit.position + direction;
+       vec4 reflected        = glm::reflect( incident, normal );
+       reflected.w           = 1.0f;
+       float transmitted     = Transmittance( origin, hit.position );
+       vec3 new_energy       = energy * transmitted;
+       CastBeam( num, new_energy, hit.position, reflected,
+                 min_point, max_point, beams );
+     }
+
    } else {
      cout << "Direction does not terminate\n";
    }
+
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
