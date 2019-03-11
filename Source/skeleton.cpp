@@ -77,7 +77,8 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.5,-0.7,1);
-vec3 light_power = 14.f * vec3( 1, 1, 1 );
+vec3 light_power = 0.5f * vec3( 1, 1, 1 );
+// vec3 light_power = 14.f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -86,6 +87,10 @@ std::normal_distribution<> dis(0.0, 1 );
 
 AABB rroot;
 Node* root;
+
+float absorption_c = 0.035;
+float scattering_c = 0.005;
+float extinction_c = absorption_c + scattering_c;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -108,7 +113,21 @@ void DrawTree( Node* parent, screen* screen );
 void BuildTree( Node* parent, vector<PhotonSeg>& child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
-void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current );
+void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<PhotonBeam>& beams );
+void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
+
+void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
+  mat4 matrix;  TransformationMatrix( matrix );
+  mat4 inv = glm::inverse( matrix );
+
+  AABB box = parent->aabb;
+  DrawBoundingBox( screen, box );
+  vec4 hit;
+  if( HitBoundingBox( box, start, dir, hit ) ){
+    PhotonBeam b; b.start = inv * start; b.end = hit;
+    DrawBeam( screen, b, vec3(0,0,0) );
+  }
+}
 
 int main( int argc, char* argv[] )
 {
@@ -116,6 +135,7 @@ int main( int argc, char* argv[] )
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
+
   rroot = CastPhotonBeams( 1000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
@@ -141,8 +161,14 @@ int main( int argc, char* argv[] )
 void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
+  mat4 inv = glm::inverse( matrix );
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
+
+  // for( int i=0; i<beams.size(); i++ ){
+  //   PhotonBeam b = beams[i];
+  //   DrawBeam( screen, b, vec3( 0.15f, 0.75f, 0.75f ) );
+  // }
 
   // Drawing stage
   for( int x = 0; x < SCREEN_WIDTH; x++ ) {
@@ -151,27 +177,32 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       float y_dir = y - ( SCREEN_HEIGHT / (float) 2);
 
       vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-      vec4 start = matrix * camera;
+      // vec4 start = matrix * camera;
       // vec4 start = camera;
+      vec4 start = vec4( 0, 0, 0, 1 );
       Intersection c_i;
 
       vec3 current = vec3( 0, 0, 0 );
-      BeamRadiance( start, direction, root, current );
+      BeamRadiance( start, direction, root, current, beams );
 
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
         vec3 power = DirectLight( c_i );
         // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
-        PutPixelSDL( screen, x, y, current * close.colour );
+        if( current.x > 0.001 ){
+          PutPixelSDL( screen, x, y, current * close.colour );
+        }
       }
     }
+    // float x_dir = 0;
+    // float y_dir = 0;
+    // vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
+    // vec4 start = glm::inverse(matrix) * vec4( 0, 0, 0, 1 );
+    // Testing( screen, start, direction, root, vec3(0,0,0) );
   }
 
   // DrawTree( root, screen );
-  // for( int i=0; i<beams.size(); i++ ){
-  //   PhotonBeam b = beams[i];
-  //   DrawBeam( screen, b, vec3(1,1,1) );
-  // }
+
   // DrawBoundedBeams( screen, items );
 }
 
@@ -212,8 +243,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       }  else if( box.mid.x > mid.x ) {
         r.push_back( box );
       } else {
-        // parent->segments.push_back( box );
-        // cout << "Issue 1. \n";
+        // TODO: what to do here?
         // parent->segments[i%2] = child[i];
       }
     }
@@ -225,8 +255,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       }  else if( box.mid.y > mid.y ){
         r.push_back( box );
       } else {
-        // parent->segments.push_back( box );
-        // cout << "Issue 2. \n";
+        // TODO: what to do here?
         // parent->segments[i%2] = child[i];
       }
     }
@@ -238,8 +267,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
       } else if( box.mid.z < mid.z ){
         r.push_back( box );
       } else {
-        // parent->segments.push_back( box );
-        // cout << "Issue 3. \n";
+        // TODO: what to do here?
         // parent->segments[i%2] = child[i];
       }
     }
@@ -313,13 +341,14 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
         j = j + b.radius;
       }
 
-      beam_seg.id    = i;
-      beam_seg.start = min_prev;
-      float max_x    = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
-      float max_z    = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
-      beam_seg.end   = vec4( max_x, j, max_z, 1.0f );
-      beam_seg.mid   = ( beam_seg.start + beam_seg.end ) / 2.0f;
-      min_prev       = beam_seg.end;
+      beam_seg.radius = b.radius;
+      beam_seg.id     = i;
+      beam_seg.start  = min_prev;
+      float max_x     = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
+      float max_z     = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
+      beam_seg.end    = vec4( max_x, j, max_z, 1.0f );
+      beam_seg.mid    = ( beam_seg.start + beam_seg.end ) / 2.0f;
+      min_prev        = beam_seg.end;
 
       items.push_back( beam_seg );
       index++;
@@ -345,8 +374,6 @@ void DrawTree( Node* parent, screen* screen ){
 }
 
 void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
-  mat4 matrix;  TransformationMatrix( matrix );
-
   Pixel proj1; Vertex v1; v1.position = b.start;
   Pixel proj2; Vertex v2; v2.position = b.end;
   VertexShader( v1, proj1 );
@@ -363,7 +390,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin = matrix * light_position;
   vec4 centre = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  float radius = 0.3f;
+  float radius = 0.4f;
 
   for( int i=0; i<number; i++ ){
     Intersection c_i;
@@ -374,7 +401,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
       beam.start  = origin;
       beam.end    = c_i.position;
       beam.offset = 0;
-      beam.radius = 0.05;
+      beam.radius = 0.01;
       beams.push_back( beam );
 
       max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
@@ -409,11 +436,21 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
   return( position - origin );
 }
 
-void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current ){
+float Transmittance( vec4 start, vec4 hit ){
+  vec4 difference = start - hit;
+  float length    = glm::length( difference );
+  float power     = - extinction_c * length;
+  return exp( power );
+}
+
+void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<PhotonBeam>& beams ){
   vec4 hit;
 
   Node* left     = parent->left;
   Node* right    = parent->right;
+
+  mat4 matrix;  TransformationMatrix( matrix );
+  vec4 light_location = matrix * light_position;
 
   if( left != NULL){
     AABB box_left  = left->aabb;
@@ -426,15 +463,15 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current ){
         PhotonSeg a = segments[i];
         if( a.id != -1 ){
           // Increase the radiance based on the PhotonBeam
-          current += 0.7f*vec3( 1, 1, 1 );
+          float strength_p = Transmittance( light_location, a.mid );
+          float strength_c = Transmittance( start, a.mid );
+          current += ( light_power * strength_p ) * strength_c;
         }
       }
       if( left->left != NULL || left->right != NULL ){
-        BeamRadiance( start, dir, left, current );
+        BeamRadiance( start, dir, left, current, beams );
       }
     }
-  } else {
-    cout << "Left is null\n";
   }
 
   if( right != NULL ){
@@ -448,18 +485,20 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current ){
         PhotonSeg a = segments[i];
         if( a.id != -1 ){
           // Increase the radiance based on the PhotonBeam
-          current += 0.7f*vec3( 1, 1, 1 );
+          float strength_p = Transmittance( light_location, a.mid );
+          float strength_c = Transmittance( start, a.mid );
+          current += ( light_power * strength_p ) * strength_c;
         }
       }
       if( right->left != NULL || right->right != NULL ){
-        BeamRadiance( start, dir, right, current );
+        BeamRadiance( start, dir, right, current, beams );
       }
     }
   }
 }
 
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
-  const int DIMS = 3; int RIGHT=0; int LEFT=0; int MIDDLE=0;
+  const int DIMS = 3; int RIGHT=0; int LEFT=1; int MIDDLE=2;
   int quadrant[DIMS];
   bool inside = true;
   float min_b[DIMS] = { box.min.x, box.min.y, box.max.z };
@@ -467,6 +506,12 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   float candidate_plane[DIMS];
   float distances[DIMS];
   float position[DIMS];
+  for( int i=0; i<DIMS; i++ ){
+    if( min_b[i] > max_b[i] ){
+      cout << "Min: " << min_b[i] << " , i: " << i << "\n";
+      cout << "Max: " << max_b[i] << " , i: " << i << "\n";
+    }
+  }
 
   dir                   = glm::normalize( dir );
   float origin[DIMS]    = {start.x, start.y, start.z};
@@ -491,10 +536,10 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   }
 
   for( int i=0; i<DIMS; i++ ){
-    if(  direction[i] != 0 ){
-      distances[i] = ( candidate_plane[i] - origin[i] ) / direction[i];
+    if(  direction[i] != 0 && quadrant[i] != MIDDLE ){
+      distances[i] =  candidate_plane[i] - origin[i] / direction[i];
     } else {
-      distances[i] = -1.0f;
+      distances[i] = -1;
     }
   }
 
@@ -510,6 +555,7 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
     if ( largest != i ){
       position[i] = origin[i] + ( distances[largest] * direction[i] );
       if (position[i] < min_b[i] || position[i] > max_b[i]){
+
 				return false;
       }
     } else {
