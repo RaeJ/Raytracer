@@ -153,7 +153,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 500, beams );
+  rroot = CastPhotonBeams( 10000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -334,39 +334,38 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
 }
 
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
-  int index = 0;
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
 
     vec4 start = b.start;
     vec4 end = b.end;
 
-    vec4 dir = b.start - b.end;
+    vec4 dir = glm::normalize( b.end - b.start );
     float j=start.y;
     // float step = b.radius;
-    float step = 0.25;
+    float step = 0.05;
 
     vec4 min_prev = vec4( start.x, start.y, start.z, 1.0f );
     while( j<end.y ){
       PhotonSeg beam_seg;
+      vec4 max = min_prev + ( dir * step );
 
-      if( j + step > end.y ){
+      if( max.y > end.y ){
         j = end.y;
+        beam_seg.end = vec4( end.x + b.radius, end.y, end.z - b.radius, 1.0f );
+        min_prev     = vec4( end.x, end.y, end.z, 1.0f );
       } else {
-        j = j + step;
+        j = max.y;
+        beam_seg.end = vec4( max.x + b.radius, max.y, max.z - b.radius, 1.0f );
+        min_prev     = vec4( max.x, max.y, max.z, 1.0f );
       }
 
+      beam_seg.start  = vec4( min_prev.x - b.radius, min_prev.y, min_prev.z + b.radius, 1.0f );
       beam_seg.radius = b.radius;
       beam_seg.id     = i;
-      beam_seg.start  = vec4( min_prev.x - b.radius, min_prev.y, min_prev.z + b.radius, 1.0f );
-      float max_x     = min_prev.x - ( ( min_prev.y - j ) * dir.x / dir.y );
-      float max_z     = min_prev.z - ( ( min_prev.y - j ) * dir.z / dir.y );
-      beam_seg.end    = vec4( max_x + b.radius, j, max_z - b.radius, 1.0f );
       beam_seg.mid    = ( beam_seg.start + beam_seg.end ) / 2.0f;
-      min_prev        = vec4( max_x, j, max_z, 1.0f );
 
       items.push_back( beam_seg );
-      index++;
     }
   }
 }
