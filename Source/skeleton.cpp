@@ -80,7 +80,7 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+vec3 light_power = 0.1f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -343,15 +343,17 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
 
     vec4 dir = b.start - b.end;
     float j=start.y;
+    // float step = b.radius;
+    float step = 0.25;
 
     vec4 min_prev = vec4( start.x, start.y, start.z, 1.0f );
     while( j<end.y ){
       PhotonSeg beam_seg;
 
-      if( j + b.radius > end.y ){
+      if( j + step > end.y ){
         j = end.y;
       } else {
-        j = j + b.radius;
+        j = j + step;
       }
 
       beam_seg.radius = b.radius;
