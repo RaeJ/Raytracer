@@ -80,12 +80,12 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 0.1f * vec3( 1, 1, 1 );
+vec3 light_power = 0.001f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
 std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-std::normal_distribution<> dis(0.0, 1 );
+std::normal_distribution<> dis(0.0, 4 );
 
 AABB rroot;
 Node* root;
@@ -117,6 +117,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( vec4 start,
                    vec4 dir,
+                   vec4& limit,
                    Node* parent,
                    vec3& current,
                    vector<PhotonBeam>& beams
@@ -152,7 +153,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 1000, beams );
+  rroot = CastPhotonBeams( 50000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -196,23 +197,20 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       vec4 start = vec4( 0, 0, 0, 1 );
       Intersection c_i;
 
-      vec3 current = vec3( 0, 0, 0 );
-      BeamRadiance( start, direction, root, current, beams );
+
 
       if( ClosestIntersection( start, direction, c_i ) ){
         Triangle close = triangles[c_i.index];
-        // vec3 power = DirectLight( c_i );
-        // PutPixelSDL( screen, x, y, ( power + indirect_light ) * close.colour );
+
+        vec3 current = vec3( 0, 0, 0 );
+        BeamRadiance( start, direction, c_i.position, root, current, beams );
+
         if( current.x > 0.001 ){
           PutPixelSDL( screen, x, y, current * close.colour );
         }
       }
     }
-    // float x_dir = 0;
-    // float y_dir = 0;
-    // vec4 direction = vec4( x_dir, y_dir, focal, 1.0);
-    // vec4 start = glm::inverse(matrix) * vec4( 0, 0, 0, 1 );
-    // Testing( screen, start, direction, root, vec3(0,0,0) );
+    // SDL_Renderframe(screen);
   }
 
   // DrawTree( root, screen );
@@ -484,7 +482,9 @@ float Transmittance( vec4 start, vec4 hit ){
   return exp( power );
 }
 
-void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<PhotonBeam>& beams ){
+// TODO: Check if the limit is working correctly
+void BeamRadiance( vec4 start, vec4 dir, vec4& limit, Node* parent,
+                   vec3& current, vector<PhotonBeam>& beams ){
   vec4 hit;
 
   Node* left     = parent->left;
@@ -492,35 +492,39 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<Pho
 
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 light_location = matrix * light_position;
+  float max_distance  = glm::length( limit - start );
 
   if( left != NULL){
     AABB box_left  = left->aabb;
     if( HitBoundingBox( box_left, start, dir, hit ) ){
-      // Hits the left box at some point
-      PhotonSeg segments[2];
-      segments[0] = left->segments[0];
-      segments[1] = left->segments[1];
-      for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-        PhotonSeg a = segments[i];
-        if( a.id != -1 ){
-          // Increase the radiance based on the PhotonBeam
-          float strength_p = Transmittance( light_location, a.mid );
-          float strength_c = Transmittance( start, a.mid );
+      float hit_distance = glm::length( hit - start );
+      if( hit_distance < max_distance ){
+        // Hits the left box at some point
+        PhotonSeg segments[2];
+        segments[0] = left->segments[0];
+        segments[1] = left->segments[1];
+        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+          PhotonSeg a = segments[i];
+          if( a.id != -1 ){
+            // Increase the radiance based on the PhotonBeam
+            float strength_p = Transmittance( light_location, a.mid );
+            float strength_c = Transmittance( start, a.mid );
 
-          // (L1)    r = a + bs,
-          // (L2)    r = c + dt,
-          // g = (a-c)·(b×d) / |b×d|
-          vec3 _b         = glm::normalize( vec3( dir ) );
-          vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
-          vec3 cross      = glm::cross( _b, _d );
-          float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+            // (L1)    r = a + bs,
+            // (L2)    r = c + dt,
+            // g = (a-c)·(b×d) / |b×d|
+            vec3 _b         = glm::normalize( vec3( dir ) );
+            vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
+            vec3 cross      = glm::cross( _b, _d );
+            float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
 
-          float strength_r= a.radius / distance;
-          current += beams[i].energy * strength_p * strength_c * strength_r;
+            float strength_r= a.radius / distance;
+            current += beams[i].energy * strength_p * strength_c * strength_r;
+          }
         }
-      }
-      if( left->left != NULL || left->right != NULL ){
-        BeamRadiance( start, dir, left, current, beams );
+        if( left->left != NULL || left->right != NULL ){
+          BeamRadiance( start, dir, limit, left, current, beams );
+        }
       }
     }
   }
@@ -528,31 +532,34 @@ void BeamRadiance( vec4 start, vec4 dir, Node* parent, vec3& current, vector<Pho
   if( right != NULL ){
     AABB box_right = right->aabb;
     if( HitBoundingBox( box_right, start, dir, hit ) ){
-      // Hits the right box at some point
-      PhotonSeg segments[2];
-      segments[0] = right->segments[0];
-      segments[1] = right->segments[1];
-      for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-        PhotonSeg a = segments[i];
-        if( a.id != -1 ){
-          // Increase the radiance based on the PhotonBeam
-          float strength_p = Transmittance( light_location, a.mid );
-          float strength_c = Transmittance( start, a.mid );
+      float hit_distance = glm::length( hit - start );
+      if( hit_distance < max_distance ){
+        // Hits the right box at some point
+        PhotonSeg segments[2];
+        segments[0] = right->segments[0];
+        segments[1] = right->segments[1];
+        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+          PhotonSeg a = segments[i];
+          if( a.id != -1 ){
+            // Increase the radiance based on the PhotonBeam
+            float strength_p = Transmittance( light_location, a.mid );
+            float strength_c = Transmittance( start, a.mid );
 
-          // (L1)    r = a + bs,
-          // (L2)    r = c + dt,
-          // g = (a-c)·(b×d) / |b×d|
-          vec3 _b         = glm::normalize( vec3( dir ) );
-          vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
-          vec3 cross      = glm::cross( _b, _d );
-          float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+            // (L1)    r = a + bs,
+            // (L2)    r = c + dt,
+            // g = (a-c)·(b×d) / |b×d|
+            vec3 _b         = glm::normalize( vec3( dir ) );
+            vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
+            vec3 cross      = glm::cross( _b, _d );
+            float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
 
-          float strength_r= a.radius / distance;
-          current += beams[i].energy * strength_p * strength_c * strength_r;
+            float strength_r= a.radius / distance;
+            current += beams[i].energy * strength_p * strength_c * strength_r;
+          }
         }
-      }
-      if( right->left != NULL || right->right != NULL ){
-        BeamRadiance( start, dir, right, current, beams );
+        if( right->left != NULL || right->right != NULL ){
+          BeamRadiance( start, dir, limit, right, current, beams );
+        }
       }
     }
   }
