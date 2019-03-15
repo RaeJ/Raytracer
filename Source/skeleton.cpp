@@ -32,8 +32,8 @@ struct PhotonSeg
   vec4 start;
   vec4 end;
   vec4 mid;
-  vec3 min;
-  vec3 max;
+  vec4 min;
+  vec4 max;
   float radius;
   int id;
 };
@@ -158,7 +158,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 100, beams );
+  rroot = CastPhotonBeams( 1000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -275,8 +275,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        parent->segments[i%2] = child[i];
-        segments.push_back( child[i] );
+        // parent->segments[i%2] = child[i];
+        // segments.push_back( child[i] );
       }
     }
   } else if( diff.y > diff.z ){
@@ -288,8 +288,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        parent->segments[i%2] = child[i];
-        segments.push_back( child[i] );
+        // parent->segments[i%2] = child[i];
+        // segments.push_back( child[i] );
       }
     }
   } else {
@@ -301,26 +301,26 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        parent->segments[i%2] = child[i];
-        segments.push_back( child[i] );
+        // parent->segments[i%2] = child[i];
+        // segments.push_back( child[i] );
       }
     }
   }
-
   vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
   int l_size = l.size();
   if( l_size != 0 ){
     for( int i=0; i<l_size; i++ ){
-      max.x = fmax( l[i].start.x, fmax( l[i].end.x, max.x ) );
-      max.y = fmax( l[i].start.y, fmax( l[i].end.y, max.y ) );
-      max.z = fmin( l[i].start.z, fmin( l[i].end.z, max.z ) );
-      min.x = fmin( l[i].start.x, fmin( l[i].end.x, min.x ) );
-      min.y = fmin( l[i].start.y, fmin( l[i].end.y, min.y ) );
-      min.z = fmax( l[i].start.z, fmax( l[i].end.z, min.z ) );
+      max.x = fmax( l[i].min.x, fmax( l[i].max.x, max.x ) );
+      max.y = fmax( l[i].min.y, fmax( l[i].max.y, max.y ) );
+      max.z = fmin( l[i].min.z, fmin( l[i].max.z, max.z ) );
+      min.x = fmin( l[i].min.x, fmin( l[i].max.x, min.x ) );
+      min.y = fmin( l[i].min.y, fmin( l[i].max.y, min.y ) );
+      min.z = fmax( l[i].min.z, fmax( l[i].max.z, min.z ) );
     }
+
     AABB left_child;
-    left_child.min = min;
-    left_child.max = max;
+    left_child.min = vec4( min.x, min.y, min.z, 1.0f );
+    left_child.max = vec4( max.x, max.y, max.z, 1.0f );
     left_child.mid = ( min + max ) / 2.0f;
     Node *left_node = newNode( left_child );
     parent->left = left_node;
@@ -333,21 +333,20 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
   int r_size = r.size();
   if( r_size != 0 ){
     for( int i=0; i<r_size; i++ ){
-      max.x = fmax( r[i].end.x, fmax( r[i].start.x, max.x ) );
-      max.y = fmax( r[i].end.y, fmax( r[i].start.y, max.y ) );
-      max.z = fmin( r[i].end.z, fmin( r[i].start.z, max.z ) );
-      min.x = fmin( r[i].end.x, fmin( r[i].start.x, min.x ) );
-      min.y = fmin( r[i].end.y, fmin( r[i].start.y, min.y ) );
-      min.z = fmax( r[i].end.z, fmax( r[i].start.z, min.z ) );
+      max.x = fmax( r[i].max.x, fmax( r[i].min.x, max.x ) );
+      max.y = fmax( r[i].max.y, fmax( r[i].min.y, max.y ) );
+      max.z = fmin( r[i].max.z, fmin( r[i].min.z, max.z ) );
+      min.x = fmin( r[i].max.x, fmin( r[i].min.x, min.x ) );
+      min.y = fmin( r[i].max.y, fmin( r[i].min.y, min.y ) );
+      min.z = fmax( r[i].max.z, fmax( r[i].min.z, min.z ) );
     }
     AABB right_child;
-    right_child.min = min;
-    right_child.max = max;
+    right_child.min = vec4( min.x, min.y, min.z, 1.0f );
+    right_child.max = vec4( max.x, max.y, max.z, 1.0f );
     right_child.mid = ( min + max ) / 2.0f;
     Node *right_node = newNode( right_child );
     parent->right = right_node;
     BuildTree( parent->right, r );
-
   } else {
     parent -> right = NULL;
   }
@@ -377,21 +376,29 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
       if( next.x < prior.x ) x_rad = b.radius; else x_rad = -b.radius;
       if( next.z < prior.z ) z_rad = -b.radius; else z_rad = b.radius;
 
-      beam_seg.start  = vec4( prior.x - x_rad, prior.y, prior.z - z_rad, 1.0f );
+      beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
 
       if( next.y > end.y ){
         j = glm::length( end - start );
-        beam_seg.end = vec4( end.x + x_rad, end.y, end.z + z_rad, 1.0f );
-        prior     = vec4( end.x, end.y, end.z, 1.0f );
+        beam_seg.end = vec4( end.x, end.y, end.z, 1.0f );
       } else {
         j = glm::length( next - start );
-        beam_seg.end = vec4( next.x + x_rad, next.y, next.z + z_rad, 1.0f );
-        prior     = vec4( next.x, next.y, next.z, 1.0f );
+        beam_seg.end = vec4( next.x, next.y, next.z, 1.0f );
       }
+
+      prior = beam_seg.end;
 
       beam_seg.radius = b.radius;
       beam_seg.id     = i;
-      beam_seg.mid    = ( beam_seg.start + beam_seg.end ) / 2.0f;
+
+      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) - beam_seg.radius ),
+                              ( fmin( beam_seg.start.y, beam_seg.end.y) - beam_seg.radius ),
+                              ( fmax( beam_seg.start.z, beam_seg.end.z) + beam_seg.radius ), 1.0f );
+      beam_seg.max    = vec4( ( fmax( beam_seg.start.x, beam_seg.end.x) + beam_seg.radius ),
+                              ( fmax( beam_seg.start.y, beam_seg.end.y) + beam_seg.radius ),
+                              ( fmin( beam_seg.start.z, beam_seg.end.z) - beam_seg.radius ), 1.0f );
+
+      beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
 
       items.push_back( beam_seg );
     }
