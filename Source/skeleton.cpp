@@ -5,6 +5,7 @@
 #include "TestModelH.h"
 #include <stdint.h>
 #include "rasteriser.h"
+#include <math.h>
 
 using namespace std;
 using glm::vec3;
@@ -31,6 +32,8 @@ struct PhotonSeg
   vec4 start;
   vec4 end;
   vec4 mid;
+  vec3 min;
+  vec3 max;
   float radius;
   int id;
 };
@@ -73,6 +76,7 @@ struct Intersection
 /* GLOBAL VARIABLES                                                            */
 
 vector<Triangle> triangles;
+vector<PhotonSeg> segments;
 
 float m = std::numeric_limits<float>::max();
 
@@ -80,7 +84,7 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 0.1f * vec3( 1, 1, 1 );
+vec3 light_power = 0.01f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -130,7 +134,8 @@ void CastBeam( int bounce,
                vec4& max_point,
                vector<PhotonBeam>& beams
              );
-float Transmittance( vec4 start, vec4 hit );
+float Transmittance( float length, float ext );
+float Integral_722( float tc_m, float tc_p, float tb_p, float extinction );
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
 
 void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
@@ -153,7 +158,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 10000, beams );
+  rroot = CastPhotonBeams( 100, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -205,7 +210,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
             BeamRadiance( start, direction, c_i.position, root, current, beams );
 
             if( current.x > 0.001 ){
-              PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour );
+              PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
             }
           }
         }
@@ -213,6 +218,18 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     }
     // SDL_Renderframe(screen);
   }
+  // for( int i = 0; i<items.size(); i++ ){
+  //   AABB box;
+  //   box.min = vec4( fmin( items[i].start.x, items[i].end.x),
+  //                   fmin( items[i].start.y, items[i].end.y),
+  //                   fmax( items[i].start.z, items[i].end.z), 1.0f );
+  //   box.max = vec4( fmax( items[i].start.x, items[i].end.x),
+  //                   fmax( items[i].start.y, items[i].end.y),
+  //                   fmin( items[i].start.z, items[i].end.z), 1.0f );
+  //   PhotonBeam b;
+  //   b.start = box.min; b.end = box.max;
+  //   DrawBeam( screen, b, vec3(1,1,0) );
+  // }
 
   // DrawTree( root, screen );
 
@@ -238,6 +255,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
     for( int i=0; i<child.size(); i++ ){
       // parent->segments.push_back( child[i] );
       parent->segments[i] = child[i];
+      segments.push_back( child[i] );
     }
     return;
   }
@@ -257,7 +275,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
+        segments.push_back( child[i] );
       }
     }
   } else if( diff.y > diff.z ){
@@ -269,7 +288,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
+        segments.push_back( child[i] );
       }
     }
   } else {
@@ -281,7 +301,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
+        segments.push_back( child[i] );
       }
     }
   }
@@ -340,27 +361,34 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
     vec4 start = b.start;
     vec4 end = b.end;
 
-    vec4 dir = glm::normalize( b.end - b.start );
-    float j=start.y;
-    // float step = b.radius;
+    vec4 dir = glm::normalize( end - start );
+    float length = glm::length( end - start );
+    float j=0;
+
     float step = 0.05;
 
-    vec4 min_prev = vec4( start.x, start.y, start.z, 1.0f );
-    while( j<end.y ){
-      PhotonSeg beam_seg;
-      vec4 max = min_prev + ( dir * step );
+    vec4 prior = vec4( start.x, start.y, start.z, 1.0f );
 
-      if( max.y > end.y ){
-        j = end.y;
-        beam_seg.end = vec4( end.x + b.radius, end.y, end.z - b.radius, 1.0f );
-        min_prev     = vec4( end.x, end.y, end.z, 1.0f );
+    while( j<length ){
+      PhotonSeg beam_seg;
+      vec4 next = prior + ( dir * step );
+
+      float x_rad, z_rad;
+      if( next.x < prior.x ) x_rad = b.radius; else x_rad = -b.radius;
+      if( next.z < prior.z ) z_rad = -b.radius; else z_rad = b.radius;
+
+      beam_seg.start  = vec4( prior.x - x_rad, prior.y, prior.z - z_rad, 1.0f );
+
+      if( next.y > end.y ){
+        j = glm::length( end - start );
+        beam_seg.end = vec4( end.x + x_rad, end.y, end.z + z_rad, 1.0f );
+        prior     = vec4( end.x, end.y, end.z, 1.0f );
       } else {
-        j = max.y;
-        beam_seg.end = vec4( max.x + b.radius, max.y, max.z - b.radius, 1.0f );
-        min_prev     = vec4( max.x, max.y, max.z, 1.0f );
+        j = glm::length( next - start );
+        beam_seg.end = vec4( next.x + x_rad, next.y, next.z + z_rad, 1.0f );
+        prior     = vec4( next.x, next.y, next.z, 1.0f );
       }
 
-      beam_seg.start  = vec4( min_prev.x - b.radius, min_prev.y, min_prev.z + b.radius, 1.0f );
       beam_seg.radius = b.radius;
       beam_seg.id     = i;
       beam_seg.mid    = ( beam_seg.start + beam_seg.end ) / 2.0f;
@@ -393,8 +421,8 @@ void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
   VertexShader( v1, proj1 );
   VertexShader( v2, proj2 );
   DrawLine( screen, v1, v2, colour );
-  PixelShader( screen, proj1.x, proj1.y, vec3(0,1,0) );
-  PixelShader( screen, proj2.x, proj2.y, vec3(1,0,0) );
+  // PixelShader( screen, proj1.x, proj1.y, vec3(0,1,0) );
+  // PixelShader( screen, proj2.x, proj2.y, vec3(1,0,0) );
 }
 
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
@@ -453,7 +481,8 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec4 incident         = hit.position + direction;
        vec4 reflected        = glm::reflect( incident, normal );
        reflected.w           = 1.0f;
-       float transmitted     = Transmittance( origin, hit.position );
+       float diff            = glm::length( vec3( hit.position - origin ) );
+       float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams );
@@ -477,11 +506,19 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
   return( position - origin );
 }
 
-float Transmittance( vec4 start, vec4 hit ){
-  vec4 difference = start - hit;
-  float length    = glm::length( difference );
-  float power     = - extinction_c * length;
+float Transmittance( float length, float ext ){
+  float power     = - ext * length;
   return exp( power );
+}
+
+float Integral_722( float tc_m, float tc_p, float tb_p, float extinction ){
+  float integrand = 0;
+  float dt_c      = 0.001;
+  float constant  = Transmittance( tb_p, extinction_c );
+  for( float tc=tc_m; tc<tc_p; tc = tc + dt_c ){
+    integrand += ( Transmittance( tc, extinction_c ) * constant );
+  }
+  return integrand;
 }
 
 // TODO: Check if the limit is working correctly
@@ -506,22 +543,50 @@ void BeamRadiance( vec4 start, vec4 dir, vec4& limit, Node* parent,
         segments[0] = left->segments[0];
         segments[1] = left->segments[1];
         for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg a = segments[i];
-          if( a.id != -1 ){
-            // Increase the radiance based on the PhotonBeam
-            float strength_p = Transmittance( light_location, a.mid );
-            float strength_c = Transmittance( start, a.mid );
+          PhotonSeg seg = segments[i];
+          if( seg.id != -1 ){
+            // // Increase the radiance based on the PhotonBeam
+            // float strength_p = Transmittance( glm::length(vec3( light_location - seg.mid )), extinction_c );
+            // float strength_c = Transmittance( glm::length(vec3( seg.mid - start )), extinction_c );
 
             // (L1)    r = a + bs,
             // (L2)    r = c + dt,
             // g = (a-c)·(b×d) / |b×d|
-            vec3 _b         = glm::normalize( vec3( dir ) );
-            vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
-            vec3 cross      = glm::cross( _b, _d );
-            float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+            vec3 l_unit_dir = glm::normalize( vec3( dir ) );
+            vec3 c_unit_dir = glm::normalize( vec3( seg.end - seg.start ) );
+            vec3 cross      = glm::cross( l_unit_dir, c_unit_dir );
+            float t_3       = glm::dot( vec3( hit - seg.start ), cross );
+            float distance  = t_3 / glm::length( cross );
 
-            float strength_r= a.radius / distance;
-            current += beams[i].energy * strength_p * strength_c * strength_r;
+            if( distance < seg.radius ){
+              vec3 delta_p       = vec3( hit - seg.start );
+              vec3 inner_one     = l_unit_dir - ( glm::dot( l_unit_dir, c_unit_dir )
+                                                                      * c_unit_dir );
+              vec3 inner_two     = delta_p - ( glm::dot( delta_p, c_unit_dir )
+                                                                * c_unit_dir );
+              float a            = pow( glm::length( inner_one ), 2.0f );
+              float b            = 2 * glm::dot( inner_one, inner_two );
+              float c            = pow( glm::length( inner_two ), 2.0f ) -
+                                   pow( seg.radius, 2.0f );
+              float discriminant = b*b - 4*a*c;
+              if( discriminant > 0 ){
+                float t1       = (-b + sqrt(discriminant)) / (2*a);
+                float t2       = (-b - sqrt(discriminant)) / (2*a);
+                vec3 c_minus   = vec3( hit ) + ( t2 * l_unit_dir );
+                vec3 c_plus    = vec3( hit ) + ( t1 * l_unit_dir );
+                float tc_minus = glm::length( c_minus - vec3( start ) );
+                float tc_plus  = glm::length( c_plus - vec3( start ) );
+                vec3 b_plus    = t_3 * cross;
+                float tb_plus  = glm::length( b_plus - vec3( light_location ) );
+                float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
+                float phase_f  = 1 / ( 4 * PI );
+                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+
+                // float strength_r= seg.radius / distance;
+                // current += beams[i].energy * strength_p * strength_c * strength_r;
+                current += beams[i].energy * phase_f * rad * _int;
+              }
+            }
           }
         }
         if( left->left != NULL || left->right != NULL ){
@@ -541,22 +606,50 @@ void BeamRadiance( vec4 start, vec4 dir, vec4& limit, Node* parent,
         segments[0] = right->segments[0];
         segments[1] = right->segments[1];
         for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg a = segments[i];
-          if( a.id != -1 ){
-            // Increase the radiance based on the PhotonBeam
-            float strength_p = Transmittance( light_location, a.mid );
-            float strength_c = Transmittance( start, a.mid );
+          PhotonSeg seg = segments[i];
+          if( seg.id != -1 ){
+            // // Increase the radiance based on the PhotonBeam
+            // float strength_p = Transmittance( glm::length(vec3( light_location - seg.mid )), extinction_c );
+            // float strength_c = Transmittance( glm::length(vec3( seg.mid - start )), extinction_c );
 
             // (L1)    r = a + bs,
             // (L2)    r = c + dt,
             // g = (a-c)·(b×d) / |b×d|
-            vec3 _b         = glm::normalize( vec3( dir ) );
-            vec3 _d         = glm::normalize( vec3( a.end - a.start ) );
-            vec3 cross      = glm::cross( _b, _d );
-            float distance  = glm::dot( vec3( hit - a.start ), cross ) / glm::length( cross );
+            vec3 l_unit_dir = glm::normalize( vec3( dir ) );
+            vec3 c_unit_dir = glm::normalize( vec3( seg.end - seg.start ) );
+            vec3 cross      = glm::cross( l_unit_dir, c_unit_dir );
+            float t_3       = glm::dot( vec3( hit - seg.start ), cross );
+            float distance  = t_3 / glm::length( cross );
 
-            float strength_r= a.radius / distance;
-            current += beams[i].energy * strength_p * strength_c * strength_r;
+            if( distance < seg.radius ){
+              vec3 delta_p       = vec3( hit - seg.start );
+              vec3 inner_one     = l_unit_dir - ( glm::dot( l_unit_dir, c_unit_dir )
+                                                                      * c_unit_dir );
+              vec3 inner_two     = delta_p - ( glm::dot( delta_p, c_unit_dir )
+                                                                * c_unit_dir );
+              float a            = pow( glm::length( inner_one ), 2.0f );
+              float b            = 2 * glm::dot( inner_one, inner_two );
+              float c            = pow( glm::length( inner_two ), 2.0f ) -
+                                   pow( seg.radius, 2.0f );
+              float discriminant = b*b - 4*a*c;
+              if( discriminant > 0 ){
+                float t1       = (-b + sqrt(discriminant)) / (2*a);
+                float t2       = (-b - sqrt(discriminant)) / (2*a);
+                vec3 c_minus   = vec3( hit ) + ( t2 * l_unit_dir );
+                vec3 c_plus    = vec3( hit ) + ( t1 * l_unit_dir );
+                float tc_minus = glm::length( c_minus - vec3( start ) );
+                float tc_plus  = glm::length( c_plus - vec3( start ) );
+                vec3 b_plus    = t_3 * cross;
+                float tb_plus  = glm::length( b_plus - vec3( light_location ) );
+                float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
+                float phase_f  = 1 / ( 4 * PI );
+                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+
+                // float strength_r= seg.radius / distance;
+                // current += beams[i].energy * strength_p * strength_c * strength_r;
+                current += beams[i].energy * phase_f * rad * _int;
+              }
+            }
           }
         }
         if( right->left != NULL || right->right != NULL ){
