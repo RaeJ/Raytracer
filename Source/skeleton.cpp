@@ -4,6 +4,7 @@
 #include "SDLauxiliary.h"
 #include "TestModelH.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include "rasteriser.h"
 #include <math.h>
 
@@ -13,7 +14,7 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-#define BOUNCES 7
+#define BOUNCES 0
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -24,7 +25,7 @@ struct PhotonBeam
   vec4 end;
   float offset;
   float radius;
-  vec3 energy = vec3( 0, 0, 0 );
+  vec3 energy;
 };
 
 struct PhotonSeg
@@ -154,12 +155,14 @@ void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current )
 
 int main( int argc, char* argv[] )
 {
+  srand (time(NULL));
+
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 10, beams );
+  rroot = CastPhotonBeams( 100, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -184,7 +187,6 @@ int main( int argc, char* argv[] )
 void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
-  mat4 inv = glm::inverse( matrix );
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
 
@@ -235,7 +237,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   //   DrawBeam( screen, b, vec3(1,1,0) );
   //   DrawBoundingBox( screen, box );
   // }
-  // for( int i = 0; i<100; i++ ){
+  // for( int i = 0; i<beams.size(); i++ ){
   //   PhotonBeam b = beams[i];
   //   DrawBeam( screen, b, vec3(0,1,1) );
   // }
@@ -366,7 +368,6 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
   vec3 x_dir     = glm::normalize( vec3( 1, 0, 0 ) );
   vec3 y_dir     = glm::normalize( vec3( 0, 1, 0 ) );
-  vec3 z_dir     = glm::normalize( vec3( 0, 0, 1 ) );
 
   float bound    = sqrt( 2 ) / 2;
 
@@ -396,7 +397,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
       beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
 
       if( next.x > end.x || next.y > end.y || next.z > end.z ){
-        j = glm::length( end - start );
+        j = glm::length( length );
         beam_seg.end = vec4( end.x, end.y, end.z, 1.0f );
       } else {
         j = glm::length( next - vec3( start ) );
@@ -421,13 +422,27 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
       // cout << "component x: " << component.x << "\n";
       // cout << "component y: " << component.y << "\n";
       // cout << "component z: " << component.z << "\n";
+      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) ),
+                              ( fmin( beam_seg.start.y, beam_seg.end.y) ),
+                              ( fmax( beam_seg.start.z, beam_seg.end.z) ), 1.0f );
+      beam_seg.max    = vec4( ( fmax( beam_seg.start.x, beam_seg.end.x) ),
+                              ( fmax( beam_seg.start.y, beam_seg.end.y) ),
+                              ( fmin( beam_seg.start.z, beam_seg.end.z) ), 1.0f );
 
-      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) - component.x ),
-                              ( fmin( beam_seg.start.y, beam_seg.end.y) - component.y ),
-                              ( fmax( beam_seg.start.z, beam_seg.end.z) + component.z  ), 1.0f );
-      beam_seg.max    = vec4( ( fmax( beam_seg.start.x, beam_seg.end.x) + component.x  ),
-                              ( fmax( beam_seg.start.y, beam_seg.end.y) + component.y ),
-                              ( fmin( beam_seg.start.z, beam_seg.end.z) - component.z ), 1.0f );
+      if( length > 0.001 ){
+        if( !( beam_seg.start.y == start.y ) ){
+          beam_seg.min  = vec4( beam_seg.min.x - component.x,
+                                beam_seg.min.y - component.y,
+                                beam_seg.min.z + component.z, 1.0f );
+        }
+        if( !( beam_seg.end.y == end.y ) ){
+          beam_seg.max  = vec4( beam_seg.max.x + component.x,
+                                beam_seg.max.y + component.y,
+                                beam_seg.max.z - component.z, 1.0f );
+        }
+      }
+
+
 
       beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
 
@@ -527,6 +542,12 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec3 new_energy       = energy * transmitted;
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams, 0.0f );
+     }
+
+     float scattered = ( rand() / ( RAND_MAX ) );
+     if( scattered <= ( scattering_c / extinction_c ) ){
+       float random = ( rand() / ( RAND_MAX ) );
+       float t_s    = -log( 1 - random ) / extinction_c;
      }
 
    } else {
