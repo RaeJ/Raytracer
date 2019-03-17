@@ -132,7 +132,8 @@ void CastBeam( int bounce,
                vec4 direction,
                vec4& min_point,
                vec4& max_point,
-               vector<PhotonBeam>& beams
+               vector<PhotonBeam>& beams,
+               float offset
              );
 float Transmittance( float length, float ext );
 float Integral_722( float tc_m, float tc_p, float tb_p, float extinction );
@@ -158,7 +159,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 1000, beams );
+  rroot = CastPhotonBeams( 10, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -220,15 +221,23 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   }
   // for( int i = 0; i<items.size(); i++ ){
   //   AABB box;
-  //   box.min = vec4( fmin( items[i].start.x, items[i].end.x),
-  //                   fmin( items[i].start.y, items[i].end.y),
-  //                   fmax( items[i].start.z, items[i].end.z), 1.0f );
-  //   box.max = vec4( fmax( items[i].start.x, items[i].end.x),
-  //                   fmax( items[i].start.y, items[i].end.y),
-  //                   fmin( items[i].start.z, items[i].end.z), 1.0f );
+  //   // box.min = vec4( fmin( items[i].start.x, items[i].end.x),
+  //   //                 fmin( items[i].start.y, items[i].end.y),
+  //   //                 fmax( items[i].start.z, items[i].end.z), 1.0f );
+  //   // box.max = vec4( fmax( items[i].start.x, items[i].end.x),
+  //   //                 fmax( items[i].start.y, items[i].end.y),
+  //   //                 fmin( items[i].start.z, items[i].end.z), 1.0f );
+  //
+  //   box.min = items[i].min;
+  //   box.max = items[i].max;
   //   PhotonBeam b;
   //   b.start = box.min; b.end = box.max;
   //   DrawBeam( screen, b, vec3(1,1,0) );
+  //   DrawBoundingBox( screen, box );
+  // }
+  // for( int i = 0; i<100; i++ ){
+  //   PhotonBeam b = beams[i];
+  //   DrawBeam( screen, b, vec3(0,1,1) );
   // }
 
   // DrawTree( root, screen );
@@ -275,7 +284,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
         // segments.push_back( child[i] );
       }
     }
@@ -288,7 +297,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
         // segments.push_back( child[i] );
       }
     }
@@ -301,7 +310,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
         r.push_back( box );
       } else {
         // TODO: what to do here?
-        // parent->segments[i%2] = child[i];
+        parent->segments[i%2] = child[i];
         // segments.push_back( child[i] );
       }
     }
@@ -353,50 +362,72 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
 
 }
 
+// TODO: Fix this function at some point
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
+  vec3 x_dir     = glm::normalize( vec3( 1, 0, 0 ) );
+  vec3 y_dir     = glm::normalize( vec3( 0, 1, 0 ) );
+  vec3 z_dir     = glm::normalize( vec3( 0, 0, 1 ) );
+
+  float bound    = sqrt( 2 ) / 2;
+
   for( int i=0; i<beams.size(); i++ ){
     PhotonBeam b = beams[i];
 
-    vec4 start = b.start;
-    vec4 end = b.end;
+    vec4 start   = b.start;
+    vec4 end     = b.end;
 
-    vec4 dir = glm::normalize( end - start );
+    vec3 diff    = vec3( end - start );
+    vec3 dir     = glm::normalize( diff );
     float length = glm::length( end - start );
     float j=0;
 
-    float step = 0.05;
+    float cos_x  = glm::dot( abs( dir ), x_dir );
+    float cos_y  = glm::dot( abs( dir ), y_dir );
 
-    vec4 prior = vec4( start.x, start.y, start.z, 1.0f );
+    float step   = length;
+    // float step   = 0.2;
+
+    vec3 prior   = vec3( start.x, start.y, start.z );
 
     while( j<length ){
       PhotonSeg beam_seg;
-      vec4 next = prior + ( dir * step );
-
-      float x_rad, z_rad;
-      if( next.x < prior.x ) x_rad = b.radius; else x_rad = -b.radius;
-      if( next.z < prior.z ) z_rad = -b.radius; else z_rad = b.radius;
+      vec3 next = prior + ( dir * step );
 
       beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
 
-      if( next.y > end.y ){
+      if( next.x > end.x || next.y > end.y || next.z > end.z ){
         j = glm::length( end - start );
         beam_seg.end = vec4( end.x, end.y, end.z, 1.0f );
       } else {
-        j = glm::length( next - start );
+        j = glm::length( next - vec3( start ) );
         beam_seg.end = vec4( next.x, next.y, next.z, 1.0f );
       }
 
-      prior = beam_seg.end;
+      prior = vec3( beam_seg.end );
 
       beam_seg.radius = b.radius;
       beam_seg.id     = i;
 
-      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) - beam_seg.radius ),
-                              ( fmin( beam_seg.start.y, beam_seg.end.y) - beam_seg.radius ),
-                              ( fmax( beam_seg.start.z, beam_seg.end.z) + beam_seg.radius ), 1.0f );
-      beam_seg.max    = vec4( ( fmax( beam_seg.start.x, beam_seg.end.x) + beam_seg.radius ),
-                              ( fmax( beam_seg.start.y, beam_seg.end.y) + beam_seg.radius ),
-                              ( fmin( beam_seg.start.z, beam_seg.end.z) - beam_seg.radius ), 1.0f );
+      vec3 component  = vec3( 0, 0, 0 );
+      if( cos_x < cos_y ){
+        component.x = 0;
+        component.y = beam_seg.radius / bound;
+        component.z = beam_seg.radius / bound;
+      } else {
+        component.x = beam_seg.radius / bound;
+        component.y = 0;
+        component.z = beam_seg.radius / bound;
+      }
+      // cout << "component x: " << component.x << "\n";
+      // cout << "component y: " << component.y << "\n";
+      // cout << "component z: " << component.z << "\n";
+
+      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) - component.x ),
+                              ( fmin( beam_seg.start.y, beam_seg.end.y) - component.y ),
+                              ( fmax( beam_seg.start.z, beam_seg.end.z) + component.z  ), 1.0f );
+      beam_seg.max    = vec4( ( fmax( beam_seg.start.x, beam_seg.end.x) + component.x  ),
+                              ( fmax( beam_seg.start.y, beam_seg.end.y) + component.y ),
+                              ( fmin( beam_seg.start.z, beam_seg.end.z) - component.z ), 1.0f );
 
       beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
 
@@ -439,7 +470,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin    = matrix * light_position;
   vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  float radius   = 0.4f;
+  float radius   = 0.6f;
 
   vec3 energy    = light_power;
 
@@ -447,7 +478,8 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
     vec4 direction = FindDirection( origin, centre, radius );
     direction = glm::normalize( direction );
 
-    CastBeam( 0, energy, origin, direction, min_point, max_point, beams );
+    float offset = fmod( dis( gen ), 1 ) * 0.01;
+    CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset );
   }
 
   AABB root;
@@ -459,14 +491,15 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
 }
 
 void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
-               vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams ){
+               vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams,
+               float offset ){
 
    Intersection hit;
    if( ClosestIntersection( origin, direction, hit ) ){
      PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
-     beam.offset = fmod( dis( gen ), 1 ) * 0.01;
-     beam.radius = 0.01;
+     beam.offset = offset;
+     beam.radius = 0.05;
      beam.energy = energy;
 
      beam.start  = origin + beam.offset;
@@ -482,6 +515,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
 
      if( bounce < BOUNCES ){
+       // float rand            =  dis( gen ) * 0.01;
        int num               = bounce + 1;
        Triangle hit_triangle = triangles[hit.index];
        vec4 normal           = hit_triangle.normal;
@@ -492,7 +526,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
        CastBeam( num, new_energy, hit.position, reflected,
-                 min_point, max_point, beams );
+                 min_point, max_point, beams, 0.0f );
      }
 
    } else {
