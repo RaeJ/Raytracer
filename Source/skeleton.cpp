@@ -85,12 +85,16 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 0.01f * vec3( 1, 1, 1 );
+vec3 light_power = 0.1f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
 std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 std::normal_distribution<> dis(0.0, 4 );
+
+unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+std::mt19937 generator (seed);
+std::uniform_real_distribution<double> uniform(0.0, 1.0);
 
 AABB rroot;
 Node* root;
@@ -162,7 +166,7 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  rroot = CastPhotonBeams( 100, beams );
+  rroot = CastPhotonBeams( 5, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -237,10 +241,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   //   DrawBeam( screen, b, vec3(1,1,0) );
   //   DrawBoundingBox( screen, box );
   // }
-  // for( int i = 0; i<beams.size(); i++ ){
-  //   PhotonBeam b = beams[i];
-  //   DrawBeam( screen, b, vec3(0,1,1) );
-  // }
+  for( int i = 0; i<beams.size(); i++ ){
+    PhotonBeam b = beams[i];
+    DrawBeam( screen, b, vec3(0,1,1) );
+  }
 
   // DrawTree( root, screen );
 
@@ -529,25 +533,38 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
 
+     float diff  = glm::length( vec3( hit.position - origin ) );
+
      if( bounce < BOUNCES ){
        // float rand            =  dis( gen ) * 0.01;
        int num               = bounce + 1;
        Triangle hit_triangle = triangles[hit.index];
        vec4 normal           = hit_triangle.normal;
        vec4 incident         = hit.position + direction;
-       vec4 reflected        = glm::reflect( incident, normal );
-       reflected.w           = 1.0f;
-       float diff            = glm::length( vec3( hit.position - origin ) );
+       vec3 refl             = glm::reflect( vec3( incident ), vec3( normal ) );
+       vec4 reflected        = vec4( glm::normalize( refl ), 1.0f );
        float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams, 0.0f );
      }
 
-     float scattered = ( rand() / ( RAND_MAX ) );
+     float scattered  = uniform( generator );
      if( scattered <= ( scattering_c / extinction_c ) ){
-       float random = ( rand() / ( RAND_MAX ) );
-       float t_s    = -log( 1 - random ) / extinction_c;
+       float t_s         = diff * uniform( generator );
+       // TODO: check incoming direction is already normalised
+       vec4 start        = origin + ( t_s * direction );
+       float the         = 2 * PI * uniform( generator );
+       float phi         = acos(1 - 2 * uniform( generator ) );
+       float x           = sin( phi ) * cos( the );
+       float y           = sin( phi ) * sin( the );
+       float z           = cos( phi );
+       vec3 dir          = glm::normalize( vec3( x, y, z ) );
+       vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
+       float transmitted = Transmittance( t_s, extinction_c );
+       vec3 new_energy   = energy * transmitted;
+       CastBeam( bounce, new_energy, start, dir_sample,
+                 min_point, max_point, beams, 0.0f );
      }
 
    } else {
