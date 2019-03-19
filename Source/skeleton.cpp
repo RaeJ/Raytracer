@@ -673,55 +673,111 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
             float t_3       = glm::dot( vec3( hit - seg.start ), cross );
             float distance  = t_3 / glm::length( cross );
 
-            float S         = glm::length( diff_vect ) ;
+            float S_inv     = 1/glm::length( diff_vect ) ;
 
-            vec3 w_unit_dir = glm::normalize( vec3( 0.0f, 0.0f,
-                                                    glm::length( diff_vect ) ) );
+            vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
+                                                    glm::length( diff_vect ),
+                                                    0.0f ) );
 
-            vec3 T          = -seg.start;
+            vec3 T_inv      = -seg.start * S_inv;
 
-            mat3 R          = findRotationMatrix( c_unit_dir, w_unit_dir );
+            mat3 R_inv      = findRotationMatrix( c_unit_dir, w_unit_dir );
 
-            vec3 origin'    = ( R * ( glm::normalize( vec3( hit ) + T ) ) ) * S;
-            vec3 dir'       = R * l_unit_dir;
+            vec3 origin'    = ( R_inv * ( vec3( hit ) * S_inv  ) ) + T_inv;
+            vec3 dir'       = R_inv * l_unit_dir;
+
+            vec3 hit_pos    = vec3( -1, -1, -1 );
 
             // Quadratic Formula
+            float t0, t1;
 
+            // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
+            float a = dir'[0] * dir'[0]
+            	      + dir'[2] * dir'[2];
 
+            float b = 2 * origin'[0] * dir'[0]
+            	      + 2 * origin'[2] * dir'[2];
 
+            float c = origin'[0] * origin'[0]
+            	      + origin'[2] * origin'[2]
+            	      - pow( seg.radius, 2 );
 
-            if( distance < seg.radius ){
-              vec3 delta_p       = vec3( hit - seg.start );
-              vec3 inner_one     = l_unit_dir - ( glm::dot( l_unit_dir, c_unit_dir )
-                                                                      * c_unit_dir );
-              vec3 inner_two     = delta_p - ( glm::dot( delta_p, c_unit_dir )
-                                                                * c_unit_dir );
-              float a            = pow( glm::length( inner_one ), 2.0f );
-              float b            = 2 * glm::dot( inner_one, inner_two );
-              float c            = pow( glm::length( inner_two ), 2.0f ) -
-                                   pow( seg.radius, 2.0f );
-              float discriminant = b*b - 4*a*c;
-              if( discriminant > 0 ){
-                float t1       = (-b + sqrt(discriminant)) / (2*a);
-                float t2       = (-b - sqrt(discriminant)) / (2*a);
-                vec3 c_minus   = vec3( hit ) + ( t2 * l_unit_dir );
-                vec3 c_plus    = vec3( hit ) + ( t1 * l_unit_dir );
-                float tc_minus = glm::length( c_minus - vec3( start ) );
-                float tc_plus  = glm::length( c_plus - vec3( start ) );
-                vec3 b_plus    = t_3 * cross;
-                float tb_plus  = glm::length( b_plus - vec3( light_location ) );
-                float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
-                float phase_f  = 1 / ( 4 * PI );
-                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+            float b24ac = b*b - 4*a*c;
+            if ( b24ac > 0 ){
+              float sqb24ac = sqrtf(b24ac);
+              t0 = (-b + sqb24ac) / (2 * a);
+              t1 = (-b - sqb24ac) / (2 * a);
 
-                // float strength_r= seg.radius / distance;
-                // current += beams[i].energy * strength_p * strength_c * strength_r;
-                PhotonBeam b;
-                b.start = vec4( c_minus, 1.0f ); b.end = vec4( c_plus, 1.0f );
-                DrawBeam( screen, b, vec3(1,1,0) );
-                // current += beams[seg.id].energy * phase_f * rad * _int;
+              if (t0>t1) {float tmp = t0;t0=t1;t1=tmp;}
+
+              float y0 = origin'[1] + t0 * dir'[1];
+              float y1 = origin'[1] + t1 * dir'[1];
+              if (y0<0)
+              {
+              	if (y1>=0)
+              	{
+              		// hit the cap
+              		float th = t0 + (t1-t0) * y0 / (y0-y1);
+              		if (th>0){
+                    hit_pos = origin' + ( dir' * th )
+                  }
+              	}
+              }
+              else if (y0>=0 && y0<=1)
+              {
+              	// hit the cylinder bit
+              	if (t0>0){
+                  hit_pos = origin' + ( dir' * t0 );
+                }
+              }
+              else if (y0>1)
+              {
+              	if (y1<=1)
+              	{
+              		// hit the cap
+              		float th = t0 + (t1-t0) * y0 / (y0-y1);
+              		if (th>0){
+                    hit_pos = origin' + ( dir' * th );
+                  }
+              	}
               }
             }
+
+            //
+            //
+            //
+            // if( distance < seg.radius ){
+            //   vec3 delta_p       = vec3( hit - seg.start );
+            //   vec3 inner_one     = l_unit_dir - ( glm::dot( l_unit_dir, c_unit_dir )
+            //                                                           * c_unit_dir );
+            //   vec3 inner_two     = delta_p - ( glm::dot( delta_p, c_unit_dir )
+            //                                                     * c_unit_dir );
+            //   float a            = pow( glm::length( inner_one ), 2.0f );
+            //   float b            = 2 * glm::dot( inner_one, inner_two );
+            //   float c            = pow( glm::length( inner_two ), 2.0f ) -
+            //                        pow( seg.radius, 2.0f );
+            //   float discriminant = b*b - 4*a*c;
+            //   if( discriminant > 0 ){
+            //     float t1       = (-b + sqrt(discriminant)) / (2*a);
+            //     float t2       = (-b - sqrt(discriminant)) / (2*a);
+            //     vec3 c_minus   = vec3( hit ) + ( t2 * l_unit_dir );
+            //     vec3 c_plus    = vec3( hit ) + ( t1 * l_unit_dir );
+            //     float tc_minus = glm::length( c_minus - vec3( start ) );
+            //     float tc_plus  = glm::length( c_plus - vec3( start ) );
+            //     vec3 b_plus    = t_3 * cross;
+            //     float tb_plus  = glm::length( b_plus - vec3( light_location ) );
+            //     float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
+            //     float phase_f  = 1 / ( 4 * PI );
+            //     float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+            //
+            //     // float strength_r= seg.radius / distance;
+            //     // current += beams[i].energy * strength_p * strength_c * strength_r;
+            //     PhotonBeam b;
+            //     b.start = vec4( c_minus, 1.0f ); b.end = vec4( c_plus, 1.0f );
+            //     DrawBeam( screen, b, vec3(1,1,0) );
+            //     // current += beams[seg.id].energy * phase_f * rad * _int;
+            //   }
+            // }
           }
         }
         if( left->left != NULL || left->right != NULL ){
