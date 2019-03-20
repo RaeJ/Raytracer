@@ -231,26 +231,26 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     }
     // SDL_Renderframe(screen);
   }
-  for( int i = 0; i<items.size(); i++ ){
-    AABB box;
-    // box.min = vec4( fmin( items[i].start.x, items[i].end.x),
-    //                 fmin( items[i].start.y, items[i].end.y),
-    //                 fmax( items[i].start.z, items[i].end.z), 1.0f );
-    // box.max = vec4( fmax( items[i].start.x, items[i].end.x),
-    //                 fmax( items[i].start.y, items[i].end.y),
-    //                 fmin( items[i].start.z, items[i].end.z), 1.0f );
-
-    box.min = items[i].min;
-    box.max = items[i].max;
-    PhotonBeam b;
-    b.start = box.min; b.end = box.max;
-    // DrawBeam( screen, b, vec3(1,1,0) );
-    DrawBoundingBox( screen, box );
-  }
-  for( int i = 0; i<beams.size(); i++ ){
-    PhotonBeam b = beams[i];
-    DrawBeam( screen, b, vec3(0,1,1) );
-  }
+  // for( int i = 0; i<items.size(); i++ ){
+  //   AABB box;
+  //   // box.min = vec4( fmin( items[i].start.x, items[i].end.x),
+  //   //                 fmin( items[i].start.y, items[i].end.y),
+  //   //                 fmax( items[i].start.z, items[i].end.z), 1.0f );
+  //   // box.max = vec4( fmax( items[i].start.x, items[i].end.x),
+  //   //                 fmax( items[i].start.y, items[i].end.y),
+  //   //                 fmin( items[i].start.z, items[i].end.z), 1.0f );
+  //
+  //   box.min = items[i].min;
+  //   box.max = items[i].max;
+  //   PhotonBeam b;
+  //   b.start = box.min; b.end = box.max;
+  //   // DrawBeam( screen, b, vec3(1,1,0) );
+  //   DrawBoundingBox( screen, box );
+  // }
+  // for( int i = 0; i<beams.size(); i++ ){
+  //   PhotonBeam b = beams[i];
+  //   DrawBeam( screen, b, vec3(0,1,1) );
+  // }
 
   // DrawTree( root, screen );
 
@@ -657,6 +657,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
   if( left != NULL){
     AABB box_left  = left->aabb;
     if( HitBoundingBox( box_left, start, dir, hit ) ){
+
       float hit_distance = glm::length( hit - start );
       if( hit_distance < max_distance ){
         // Hits the left box at some point
@@ -687,7 +688,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
             vec3 second_hit;
 
             // Quadratic Formula
-            float t0, t1;
+            float t0 = -1, t1 = -1;
 
             // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
             float a = dir_prime[0] * dir_prime[0]
@@ -770,21 +771,52 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
                   }
               	}
               }
+              if( t0>0 && t1>0 ){
+
+                // vec3 t_b_minus      = vec3( 0, first_hit.y, 0 );
+                // vec3 t_b_plus       = vec3( 0, second_hit.y, 0 );
+                vec3 w_c_minus      = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
+                vec3 w_c_plus       = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
+                // vec3 w_b_minus      = ( glm::inverse( R_inv ) * ( t_b_minus - T_inv ) ) / S_inv;
+                // vec3 w_b_plus       = ( glm::inverse( R_inv ) * ( t_b_plus - T_inv ) ) / S_inv;
+                float tb_minus      = first_hit.y / S_inv;
+                float tb_plus       = second_hit.y / S_inv;
+                float tc_minus      = t0 / S_inv;
+                float tc_plus       = t1 / S_inv;
+                Pixel p1; Vertex v1; v1.position = seg.start;
+                Pixel p2; Vertex v2; v2.position = seg.end;
+                Pixel p3; Vertex v3; v3.position = vec4( w_c_minus, 1.0f );
+                Pixel p4; Vertex v4; v4.position = vec4( w_c_plus, 1.0f );
+                VertexShader( v1, p1 );
+                VertexShader( v2, p2 );
+                VertexShader( v3, p3 );
+                VertexShader( v4, p4 );
+                PixelShader( screen, p4.x, p4.y, vec3(0,1,0) );
+                PixelShader( screen, p3.x, p3.y, vec3(1,0,1) );
+                PixelShader( screen, p1.x, p1.y, vec3(1,1,0) );
+                PixelShader( screen, p2.x, p2.y, vec3(1,1,0) );
+                AABB box;
+                box.min = seg.min;
+                box.max = seg.max;
+                DrawBoundingBox( screen, box );
+                PhotonBeam b = beams[seg.id];
+                DrawBeam( screen, b, vec3(0,1,1) );
+
+                float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
+                float phase_f  = 1 / ( 4 * PI );
+                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+
+                // current += beams[seg.id].energy * phase_f * rad * _int;
+              }
             }
-            vec3 world_position1 = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
-            vec3 world_position2 = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
-            Pixel p1; Vertex v1; v1.position = vec4( world_position1, 1.0f );
-            Pixel p2; Vertex v2; v2.position = vec4( world_position2, 1.0f );
-            VertexShader( v1, p1 );
-            VertexShader( v2, p2 );
-            PixelShader( screen, p1.x, p1.y, vec3(1,0,1) );
-            PixelShader( screen, p2.x, p2.y, vec3(1,1,0) );
-
-
           }
         }
         if( left->left != NULL || left->right != NULL ){
           BeamRadiance( screen, start, dir, limit, left, current, beams );
+        } else {
+          Pixel h; Vertex vh; vh.position = hit;
+          VertexShader( vh, h );
+          PixelShader( screen, h.x, h.y, vec3(1,1,1) );
         }
       }
     }
