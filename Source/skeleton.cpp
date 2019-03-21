@@ -217,15 +217,47 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           vec4 start = vec4( 0, 0, 0, 1 );
           Intersection c_i;
 
-          if( ClosestIntersection( start, direction, c_i ) ){
-            Triangle close = triangles[c_i.index];
-            BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
-
-            if( current.x > 0.001 ){
-              // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
-              PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
-            }
+          vec4 hit;
+          AABB box;
+          box.min = matrix * vec4( 0.3, -0.8, 0.3, 1 );
+          box.max = matrix * vec4( 0.9, -0.1, -0.8, 1 );
+          if( HitBoundingBox( box, start, direction, hit ) ){
+            Vertex v; Pixel p;
+            v.position = hit;
+            VertexShader( v, p );
+            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
           }
+          DrawBoundingBox( screen, box );
+          vec4 hit2;
+          AABB box2;
+          box2.min = matrix * vec4( -0.9, -0.8, 0.3, 1 );
+          box2.max = matrix * vec4( -0.3, -0.1, -0.8, 1 );
+          if( HitBoundingBox( box2, start, direction, hit2 ) ){
+            Vertex v; Pixel p;
+            v.position = hit2;
+            VertexShader( v, p );
+            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
+          }
+          DrawBoundingBox( screen, box2);
+          box.min = matrix * vec4( -0.3, 0.5, -0.3, 1 );
+          box.max = matrix * vec4( 0.3, 0.8, -0.8, 1 );
+          if( HitBoundingBox( box, start, direction, hit ) ){
+            Vertex v; Pixel p;
+            v.position = hit;
+            VertexShader( v, p );
+            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
+          }
+          DrawBoundingBox( screen, box );
+          // direction = glm::normalize( direction );
+          // if( ClosestIntersection( start, direction, c_i ) ){
+          //   Triangle close = triangles[c_i.index];
+          //   BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
+          //
+          //   if( current.x > 0.001 ){
+          //     // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
+          //     PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+          //   }
+          // }
         }
       }
     }
@@ -656,10 +688,14 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
 
   if( left != NULL){
     AABB box_left  = left->aabb;
+    DrawBoundingBox( screen, box_left );
     if( HitBoundingBox( box_left, start, dir, hit ) ){
+      Pixel h; Vertex vh; vh.position = hit;
+      VertexShader( vh, h );
+      PixelShader( screen, h.x, h.y, vec3(1,1,1) );
 
       float hit_distance = glm::length( hit - start );
-      if( hit_distance < max_distance ){
+      if( hit_distance <= max_distance ){
         // Hits the left box at some point
         PhotonSeg segments[2];
         segments[0] = left->segments[0];
@@ -667,6 +703,11 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
         for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
+            Pixel h1; Vertex vh1; vh1.position = hit;
+            vh1.position = hit;
+            VertexShader( vh1, h1 );
+            PixelShader( screen, h1.x, h1.y, vec3(1,1,0) );
+
             vec3 l_unit_dir = glm::normalize( vec3( dir ) );
             vec3 diff_vect  = vec3( seg.end - seg.start );
             vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
@@ -813,10 +854,6 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
         }
         if( left->left != NULL || left->right != NULL ){
           BeamRadiance( screen, start, dir, limit, left, current, beams );
-        } else {
-          Pixel h; Vertex vh; vh.position = hit;
-          VertexShader( vh, h );
-          PixelShader( screen, h.x, h.y, vec3(1,1,1) );
         }
       }
     }
@@ -898,12 +935,6 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   float candidate_plane[DIMS];
   float distances[DIMS];
   float position[DIMS];
-  for( int i=0; i<DIMS; i++ ){
-    if( min_b[i] > max_b[i] ){
-      cout << "Min: " << min_b[i] << " , i: " << i << "\n";
-      cout << "Max: " << max_b[i] << " , i: " << i << "\n";
-    }
-  }
 
   dir                   = glm::normalize( dir );
   float origin[DIMS]    = {start.x, start.y, start.z};
@@ -922,6 +953,7 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
       quadrant[i]        = MIDDLE;
     }
   }
+
   if( inside ){
     hit = vec4( start.x, start.y, start.z, 1.0f );
     return true;
@@ -929,7 +961,7 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
 
   for( int i=0; i<DIMS; i++ ){
     if(  direction[i] != 0 && quadrant[i] != MIDDLE ){
-      distances[i] =  candidate_plane[i] - origin[i] / direction[i];
+      distances[i] =  ( candidate_plane[i] - origin[i] ) / direction[i];
     } else {
       distances[i] = -1;
     }
