@@ -56,6 +56,7 @@ void Interpolate( Pixel a, Pixel b, vector<Pixel>& result );
 void DrawBoundingBox( screen* screen, AABB bound );
 void DrawLine( screen* screen, Vertex& p1, Vertex& p2, vec3 colour );
 void PixelShader( screen* screen, int x, int y, vec3 colour );
+void PositionShader( screen* screen, vec4 position, vec3 colour );
 
 void DrawBoundingBox( screen* screen, AABB bound ){
   vector<Vertex> vertices(4);
@@ -141,6 +142,13 @@ void ComputePolygonEdges( screen* screen, const vector<Vertex>& vertices ){
       PixelShader( screen, edge[j].x, edge[j].y, purple );
     }
   }
+}
+
+void PositionShader( screen* screen, vec4 position, vec3 colour ){
+  Vertex v; Pixel p;
+  v.position = position;
+  VertexShader( v, p );
+  PixelShader( screen, p.x, p.y, colour );
 }
 
 void VertexShader( const Vertex& vertex, Pixel& p ){
