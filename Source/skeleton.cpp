@@ -14,7 +14,7 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-#define BOUNCES 10
+#define BOUNCES 0
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -46,6 +46,8 @@ struct CylIntersection
   float tb_plus;
   float tc_minus;
   float tc_plus;
+  vec3 entry_point;
+  vec3 exit_point;
 };
 
 struct Node
@@ -122,8 +124,7 @@ bool ClosestIntersection(
   vec4 dir,
   Intersection & closestIntersections
 );
-bool HitCylinder( screen* screen,
-                  const vec4 start,
+bool HitCylinder( const vec4 start,
                   const vec4 dir,
                   const PhotonSeg& seg,
                   CylIntersection& intersection );
@@ -185,7 +186,7 @@ int main( int argc, char* argv[] )
   LoadTestModel( triangles );
 
   cout << "Casting photons" << endl;
-  rroot = CastPhotonBeams( 500, beams );
+  rroot = CastPhotonBeams( 5, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -213,7 +214,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
-
+  bool has_hit = true;
   // Drawing stage
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
@@ -227,16 +228,50 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           vec4 start = vec4( 0, 0, 0, 1 );
           Intersection c_i;
 
-          direction = glm::normalize( direction );
-          if( ClosestIntersection( start, direction, c_i ) ){
-            Triangle close = triangles[c_i.index];
-            BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
 
-            if( current.x > 0.001 ){
-              // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
-              PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+          direction = glm::normalize( direction );
+          // if( ClosestIntersection( start, direction, c_i ) ){
+          //   Triangle close = triangles[c_i.index];
+          //   BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
+          //
+          //   if( current.x > 0.001 ){
+          //     // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
+          //     PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+          //   }
+          // }
+
+          PhotonSeg debugging; CylIntersection intersect;
+          debugging.start = matrix * vec4( 0.0, -0.8, -0.2, 1.0f );
+          debugging.end = matrix * vec4( 0.8, 0.8, -0.2, 1.0f );
+          debugging.radius = 0.2;
+          PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
+          if( HitCylinder( start, direction, debugging, intersect ) ){
+            float distance = glm::length( intersect.exit_point - intersect.entry_point );
+            if( distance > 0.6 ){
+              if( has_hit ){
+                PhotonBeam ray;
+                cout << "Distance: " << distance << endl;
+                cout << "entry x: " << intersect.entry_point.x << "\n";
+                cout << "exit x: " << intersect.exit_point.x << "\n";
+                cout << "entry y: " << intersect.entry_point.y << "\n";
+                cout << "exit y: " << intersect.exit_point.y << "\n";
+                cout << "entry z: " << intersect.entry_point.z << "\n";
+                cout << "exit z: " << intersect.exit_point.z << "\n";
+                cout << "-----------------------------------------\n";
+                ray.start = vec4( intersect.entry_point, 1.0f );
+                ray.end = vec4( intersect.exit_point, 1.0f );
+                DrawBeam( screen, ray, vec3(1,1,0) );
+                // PositionShader( screen, vec4(intersect.entry_point,1.0f), vec3(1,0,1));
+              }
+
+              has_hit = false;
             }
           }
+          PhotonBeam b;
+          b.start = debugging.start;
+          b.end = debugging.end;
+          DrawBeam( screen, b, vec3(0,1,0) );
+
         }
       }
     }
@@ -655,7 +690,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
             CylIntersection intersect;
-            if( HitCylinder( screen, start, dir, seg, intersect ) ){
+            if( HitCylinder( start, dir, seg, intersect ) ){
               float _int     = Integral_722( intersect.tc_minus,
                                              intersect.tc_plus,
                                              intersect.tb_plus,
@@ -688,7 +723,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
             CylIntersection intersect;
-            if( HitCylinder( screen, start, dir, seg, intersect ) ){
+            if( HitCylinder( start, dir, seg, intersect ) ){
               float _int     = Integral_722( intersect.tc_minus,
                                              intersect.tc_plus,
                                              intersect.tb_plus,
@@ -774,7 +809,7 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   return true;
 }
 
-bool HitCylinder( screen* screen, const vec4 start, const vec4 dir, const PhotonSeg& seg,
+bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
   CylIntersection& intersection ){
     bool intersects = false;
     vec3 l_unit_dir = glm::normalize( vec3( dir ) );
@@ -887,10 +922,12 @@ bool HitCylinder( screen* screen, const vec4 start, const vec4 dir, const Photon
       }
     }
     if( ( t0 > 0 ) && ( t1 > 0 ) && ( t1 > t0 ) ){
-      intersection.tb_minus      = first_hit.y / S_inv;
-      intersection.tb_plus       = second_hit.y / S_inv;
-      intersection.tc_minus      = t0 / S_inv;
-      intersection.tc_plus       = t1 / S_inv;
+      intersection.tb_minus    = first_hit.y / S_inv;
+      intersection.tb_plus     = second_hit.y / S_inv;
+      intersection.tc_minus    = t0 / S_inv;
+      intersection.tc_plus     = t1 / S_inv;
+      intersection.entry_point = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
+      intersection.exit_point  = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
     }
     return intersects;
 }
