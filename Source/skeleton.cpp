@@ -40,6 +40,14 @@ struct PhotonSeg
   int id;
 };
 
+struct CylIntersection
+{
+  float tb_minus;
+  float tb_plus;
+  float tc_minus;
+  float tc_plus;
+};
+
 struct Node
 {
   AABB aabb;
@@ -86,7 +94,7 @@ vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 // vec4 light_position(0,-1.2,-0.5,1);
 vec4 light_position(0,-0.8,-0.7,1);
-vec3 light_power = 0.05f * vec3( 1, 1, 1 );
+vec3 light_power = 0.1f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -114,6 +122,10 @@ bool ClosestIntersection(
   vec4 dir,
   Intersection & closestIntersections
 );
+bool HitCylinder( const vec4 start,
+                  const vec4 dir,
+                  const PhotonSeg seg,
+                  CylIntersection& intersection );
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
@@ -217,47 +229,16 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           vec4 start = vec4( 0, 0, 0, 1 );
           Intersection c_i;
 
-          vec4 hit;
-          AABB box;
-          box.min = matrix * vec4( 0.3, -0.8, 0.3, 1 );
-          box.max = matrix * vec4( 0.9, -0.1, -0.8, 1 );
-          if( HitBoundingBox( box, start, direction, hit ) ){
-            Vertex v; Pixel p;
-            v.position = hit;
-            VertexShader( v, p );
-            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
+          direction = glm::normalize( direction );
+          if( ClosestIntersection( start, direction, c_i ) ){
+            Triangle close = triangles[c_i.index];
+            BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
+
+            if( current.x > 0.001 ){
+              // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
+              PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+            }
           }
-          DrawBoundingBox( screen, box );
-          vec4 hit2;
-          AABB box2;
-          box2.min = matrix * vec4( -0.9, -0.8, 0.3, 1 );
-          box2.max = matrix * vec4( -0.3, -0.1, -0.8, 1 );
-          if( HitBoundingBox( box2, start, direction, hit2 ) ){
-            Vertex v; Pixel p;
-            v.position = hit2;
-            VertexShader( v, p );
-            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
-          }
-          DrawBoundingBox( screen, box2);
-          box.min = matrix * vec4( -0.3, 0.5, -0.3, 1 );
-          box.max = matrix * vec4( 0.3, 0.8, -0.8, 1 );
-          if( HitBoundingBox( box, start, direction, hit ) ){
-            Vertex v; Pixel p;
-            v.position = hit;
-            VertexShader( v, p );
-            PutPixelSDL( screen, p.x, p.y, vec3(1,1,0) );
-          }
-          DrawBoundingBox( screen, box );
-          // direction = glm::normalize( direction );
-          // if( ClosestIntersection( start, direction, c_i ) ){
-          //   Triangle close = triangles[c_i.index];
-          //   BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
-          //
-          //   if( current.x > 0.001 ){
-          //     // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
-          //     PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
-          //   }
-          // }
         }
       }
     }
@@ -283,6 +264,15 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   //   PhotonBeam b = beams[i];
   //   DrawBeam( screen, b, vec3(0,1,1) );
   // }
+  for( int i = 0; i<items.size(); i++ ){
+    PhotonBeam b;
+    b.start = items[i].min;
+    b.end = items[i].max;
+    DrawBeam( screen, b, vec3(0,1,0) );
+    b.start = items[i].start;
+    b.end = items[i].end;
+    DrawBeam( screen, b, vec3(1,0,0) );
+  }
 
   // DrawTree( root, screen );
 
@@ -473,33 +463,33 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
                               ( fmax( beam_seg.start.y, beam_seg.end.y) ),
                               ( fmin( beam_seg.start.z, beam_seg.end.z) ), 1.0f );
 
-      if( length > 0.001 ){
-        if( !( beam_seg.start.y == start.y ) ){
-          beam_seg.min  = vec4( beam_seg.min.x - component.x,
-                                beam_seg.min.y - component.y,
-                                beam_seg.min.z + component.z, 1.0f );
-        }
-        if( !( ( vec3( beam_seg.end ) == vec3( end ) ) ) ){
-          beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                                beam_seg.max.y + component.y,
-                                beam_seg.max.z - component.z, 1.0f );
-        } else {
-          vec4 tri_normal = abs( tri.normal );
-          if( tri_normal.x > ( tri_normal.y || tri_normal.z ) ){
-            beam_seg.max  = vec4( beam_seg.max.x,
-                                  beam_seg.max.y + component.y,
-                                  beam_seg.max.z - component.z, 1.0f );
-          } else if ( tri_normal.y > ( tri_normal.x || tri_normal.z ) ){
-            beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                                  beam_seg.max.y,
-                                  beam_seg.max.z - component.z, 1.0f );
-          } else if ( tri_normal.z > ( tri_normal.x || tri_normal.y ) ){
-            beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                                  beam_seg.max.y + component.y,
-                                  beam_seg.max.z, 1.0f );
-          }
-        }
-      }
+      // if( length > 0.001 ){
+      //   if( !( beam_seg.start.y == start.y ) ){
+      //     beam_seg.min  = vec4( beam_seg.min.x - component.x,
+      //                           beam_seg.min.y - component.y,
+      //                           beam_seg.min.z + component.z, 1.0f );
+      //   }
+      //   if( !( ( vec3( beam_seg.end ) == vec3( end ) ) ) ){
+      //     beam_seg.max  = vec4( beam_seg.max.x + component.x,
+      //                           beam_seg.max.y + component.y,
+      //                           beam_seg.max.z - component.z, 1.0f );
+      //   } else {
+      //     vec4 tri_normal = abs( tri.normal );
+      //     if( tri_normal.x > ( tri_normal.y || tri_normal.z ) ){
+      //       beam_seg.max  = vec4( beam_seg.max.x,
+      //                             beam_seg.max.y + component.y,
+      //                             beam_seg.max.z - component.z, 1.0f );
+      //     } else if ( tri_normal.y > ( tri_normal.x || tri_normal.z ) ){
+      //       beam_seg.max  = vec4( beam_seg.max.x + component.x,
+      //                             beam_seg.max.y,
+      //                             beam_seg.max.z - component.z, 1.0f );
+      //     } else if ( tri_normal.z > ( tri_normal.x || tri_normal.y ) ){
+      //       beam_seg.max  = vec4( beam_seg.max.x + component.x,
+      //                             beam_seg.max.y + component.y,
+      //                             beam_seg.max.z, 1.0f );
+      //     }
+      //   }
+      // }
 
 
 
@@ -674,6 +664,127 @@ mat3 findRotationMatrix( vec3 c_unit_dir, vec3 w_unit_dir ){
   return R;
 }
 
+bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg seg,
+  CylIntersection& intersection ){
+    bool intersects = false;
+    vec3 l_unit_dir = glm::normalize( vec3( dir ) );
+    vec3 difference = vec3( seg.end - seg.start );
+    vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
+                                            glm::length( difference ),
+                                            0.0f ) );
+
+    float S_inv     = 1/glm::length( difference ) ;
+
+    vec3 c_unit_dir = difference * S_inv;
+
+    mat3 R_inv      = findRotationMatrix( c_unit_dir, w_unit_dir );
+
+    vec3 T_inv      = -( R_inv * vec3( seg.start ) * S_inv );
+
+    vec3 origin_prime    = ( R_inv * ( vec3( start ) * S_inv  ) ) + T_inv;
+    vec3 dir_prime       = R_inv * l_unit_dir;
+
+    vec3 first_hit;
+    vec3 second_hit;
+
+    // Quadratic Formula
+    float t0 = -1, t1 = -1;
+
+    // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
+    float a = dir_prime[0] * dir_prime[0]
+            + dir_prime[2] * dir_prime[2];
+
+    float b = 2 * origin_prime[0] * dir_prime[0]
+            + 2 * origin_prime[2] * dir_prime[2];
+
+    float c = origin_prime[0] * origin_prime[0]
+            + origin_prime[2] * origin_prime[2]
+            - pow( seg.radius, 2 );
+
+    float b24ac = b*b - 4*a*c;
+
+    if( b24ac < 0 ) return false;
+
+    float sqb24ac = sqrtf(b24ac);
+    t0 = (-b + sqb24ac) / (2 * a);
+    t1 = (-b - sqb24ac) / (2 * a);
+
+    if (t0>t1) {float tmp = t0;t0=t1;t1=tmp;}
+
+    float y0 = origin_prime[1] + t0 * dir_prime[1];
+    float y1 = origin_prime[1] + t1 * dir_prime[1];
+    if ( y0 < 0 )
+    {
+      if( y1 < 0 ) return false;
+      else
+      {
+        // hit the cap
+        float th1 = t0 + (t1-t0) * y0 / (y0-y1);
+        if (th1<=0) return false;
+        first_hit = origin_prime + ( dir_prime * th1 );
+        intersects = true;
+
+        if(y1<=1){
+          second_hit = origin_prime + ( dir_prime * t1 );
+        } else {
+          float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
+          if (th2>0){
+            second_hit = origin_prime + ( dir_prime * th2 );
+          }
+        }
+      }
+    }
+    else if ( y0 >= 0 && y0 <= 1 )
+    {
+      // hit the cylinder bit
+      if( t0 <= 0 ) return false;
+      first_hit = origin_prime + ( dir_prime * t0 );
+      intersects = true;
+
+      if( y1 >= 0 ){
+        if( y1 <= 1 ){
+          second_hit = origin_prime + ( dir_prime * t1 );
+        } else {
+          float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
+          if ( th2 > 0 ){
+            second_hit = origin_prime + ( dir_prime * th2 );
+          }
+        }
+      } else {
+        float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+        if (th2>0){
+          second_hit = origin_prime + ( dir_prime * th2 );
+        }
+      }
+    }
+    else if ( y0 > 1 )
+    {
+      if ( y1 > 1 ) return false;
+      else {
+        // hit the cap
+        float th = t0 + (t1-t0) * (y0-1) / (y0-y1);
+        if( th <= 0 ) return false;
+        first_hit = origin_prime + ( dir_prime * th );
+        intersects = true;
+        if( y1 >= 0 ){
+          second_hit = origin_prime + ( dir_prime * t1 );
+        } else {
+          float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+          if ( th2 > 0 ){
+            second_hit = origin_prime + ( dir_prime * th2 );
+          }
+        }
+      }
+    }
+    if( ( t0 > 0 ) && ( t1 > 0 ) && ( t1 > t0 ) ){
+      intersection.tb_minus      = first_hit.y / S_inv;
+      intersection.tb_plus       = second_hit.y / S_inv;
+      intersection.tc_minus      = t0 / S_inv;
+      intersection.tc_plus       = t1 / S_inv;
+    }
+    return intersects;
+}
+
 // TODO: Check if the limit is working correctly
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* parent,
                    vec3& current, vector<PhotonBeam>& beams ){
@@ -688,167 +799,31 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
 
   if( left != NULL){
     AABB box_left  = left->aabb;
-    DrawBoundingBox( screen, box_left );
+    // DrawBoundingBox( screen, box_left );
     if( HitBoundingBox( box_left, start, dir, hit ) ){
-      Pixel h; Vertex vh; vh.position = hit;
-      VertexShader( vh, h );
-      PixelShader( screen, h.x, h.y, vec3(1,1,1) );
+      // Pixel h; Vertex vh; vh.position = hit;
+      // VertexShader( vh, h );
+      // PixelShader( screen, h.x, h.y, vec3(1,1,1) );
 
       float hit_distance = glm::length( hit - start );
       if( hit_distance <= max_distance ){
-        // Hits the left box at some point
         PhotonSeg segments[2];
         segments[0] = left->segments[0];
         segments[1] = left->segments[1];
         for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
-            Pixel h1; Vertex vh1; vh1.position = hit;
-            vh1.position = hit;
-            VertexShader( vh1, h1 );
-            PixelShader( screen, h1.x, h1.y, vec3(1,1,0) );
+            CylIntersection intersect;
+            if( HitCylinder( start, dir, seg, intersect ) ){
+              float _int     = Integral_722( intersect.tc_minus,
+                                             intersect.tc_plus,
+                                             intersect.tb_plus,
+                                             extinction_c );
+              float phase_f  = 1 / ( 4 * PI );
+              float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
-            vec3 l_unit_dir = glm::normalize( vec3( dir ) );
-            vec3 diff_vect  = vec3( seg.end - seg.start );
-            vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
-                                                    glm::length( diff_vect ),
-                                                    0.0f ) );
-
-            float S_inv     = 1/glm::length( diff_vect ) ;
-
-            vec3 c_unit_dir = diff_vect * S_inv;
-
-            mat3 R_inv      = findRotationMatrix( c_unit_dir, w_unit_dir );
-
-            vec3 T_inv      = -( R_inv * vec3( seg.start ) * S_inv );
-
-            vec3 origin_prime    = ( R_inv * ( vec3( hit ) * S_inv  ) ) + T_inv;
-            vec3 dir_prime       = R_inv * l_unit_dir;
-
-            vec3 first_hit;
-            vec3 second_hit;
-
-            // Quadratic Formula
-            float t0 = -1, t1 = -1;
-
-            // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
-            float a = dir_prime[0] * dir_prime[0]
-            	      + dir_prime[2] * dir_prime[2];
-
-            float b = 2 * origin_prime[0] * dir_prime[0]
-            	      + 2 * origin_prime[2] * dir_prime[2];
-
-            float c = origin_prime[0] * origin_prime[0]
-            	      + origin_prime[2] * origin_prime[2]
-            	      - pow( seg.radius, 2 );
-
-            float b24ac = b*b - 4*a*c;
-            if ( b24ac > 0 ){
-              float sqb24ac = sqrtf(b24ac);
-              t0 = (-b + sqb24ac) / (2 * a);
-              t1 = (-b - sqb24ac) / (2 * a);
-
-              if (t0>t1) {float tmp = t0;t0=t1;t1=tmp;}
-
-              float y0 = origin_prime[1] + t0 * dir_prime[1];
-              float y1 = origin_prime[1] + t1 * dir_prime[1];
-              if (y0<0)
-              {
-              	if (y1>=0)
-              	{
-              		// hit the cap
-              		float th1 = t0 + (t1-t0) * y0 / (y0-y1);
-              		if (th1>0){
-                    first_hit = origin_prime + ( dir_prime * th1 );
-                  }
-                  if(y1<=1){
-                    second_hit = origin_prime + ( dir_prime * t1 );
-                  } else {
-                    float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
-                    if (th2>0){
-                      second_hit = origin_prime + ( dir_prime * th2 );
-                    }
-                  }
-              	}
-              }
-              else if (y0>=0 && y0<=1)
-              {
-              	// hit the cylinder bit
-              	if (t0>0){
-                  first_hit = origin_prime + ( dir_prime * t0 );
-                }
-                if(y1>=0){
-                  if(y1<=1){
-                    second_hit = origin_prime + ( dir_prime * t1 );
-                  } else {
-                    float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
-                    if (th2>0){
-                      second_hit = origin_prime + ( dir_prime * th2 );
-                    }
-                  }
-                } else {
-                  float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
-                  if (th2>0){
-                    second_hit = origin_prime + ( dir_prime * th2 );
-                  }
-                }
-              }
-              else if (y0>1)
-              {
-              	if (y1<=1)
-              	{
-              		// hit the cap
-              		float th = t0 + (t1-t0) * (y0-1) / (y0-y1);
-              		if (th>0){
-                    first_hit = origin_prime + ( dir_prime * th );
-                  }
-                  if(y1>=0){
-                    second_hit = origin_prime + ( dir_prime * t1 );
-                  } else {
-                    float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
-                    if (th2>0){
-                      second_hit = origin_prime + ( dir_prime * th2 );
-                    }
-                  }
-              	}
-              }
-              if( t0>0 && t1>0 ){
-
-                // vec3 t_b_minus      = vec3( 0, first_hit.y, 0 );
-                // vec3 t_b_plus       = vec3( 0, second_hit.y, 0 );
-                vec3 w_c_minus      = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
-                vec3 w_c_plus       = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
-                // vec3 w_b_minus      = ( glm::inverse( R_inv ) * ( t_b_minus - T_inv ) ) / S_inv;
-                // vec3 w_b_plus       = ( glm::inverse( R_inv ) * ( t_b_plus - T_inv ) ) / S_inv;
-                float tb_minus      = first_hit.y / S_inv;
-                float tb_plus       = second_hit.y / S_inv;
-                float tc_minus      = t0 / S_inv;
-                float tc_plus       = t1 / S_inv;
-                Pixel p1; Vertex v1; v1.position = seg.start;
-                Pixel p2; Vertex v2; v2.position = seg.end;
-                Pixel p3; Vertex v3; v3.position = vec4( w_c_minus, 1.0f );
-                Pixel p4; Vertex v4; v4.position = vec4( w_c_plus, 1.0f );
-                VertexShader( v1, p1 );
-                VertexShader( v2, p2 );
-                VertexShader( v3, p3 );
-                VertexShader( v4, p4 );
-                PixelShader( screen, p4.x, p4.y, vec3(0,1,0) );
-                PixelShader( screen, p3.x, p3.y, vec3(1,0,1) );
-                PixelShader( screen, p1.x, p1.y, vec3(1,1,0) );
-                PixelShader( screen, p2.x, p2.y, vec3(1,1,0) );
-                AABB box;
-                box.min = seg.min;
-                box.max = seg.max;
-                DrawBoundingBox( screen, box );
-                PhotonBeam b = beams[seg.id];
-                DrawBeam( screen, b, vec3(0,1,1) );
-
-                float _int     = Integral_722( tc_minus, tc_plus, tb_plus, extinction_c );
-                float phase_f  = 1 / ( 4 * PI );
-                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
-
-                // current += beams[seg.id].energy * phase_f * rad * _int;
-              }
+              current += beams[seg.id].energy * phase_f * rad * _int;
+              // current += beams[seg.id].energy * phase_f * rad;
             }
           }
         }
@@ -858,7 +833,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
       }
     }
   }
-  //
+
   // if( right != NULL ){
   //   AABB box_right = right->aabb;
   //   if( HitBoundingBox( box_right, start, dir, hit ) ){
@@ -913,6 +888,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
   //               // PhotonBeam b;
   //               // b.start = vec4( c_minus, 1.0f ); b.end = vec4( c_plus, 1.0f );
   //               // DrawBeam( screen, b, vec3(1,1,0) );
+  //               cout << _int << endl;
   //               current += beams[seg.id].energy * phase_f * rad * _int;
   //             }
   //           }
