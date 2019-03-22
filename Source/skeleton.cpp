@@ -233,8 +233,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           direction = glm::normalize( direction );
           PhotonSeg debugging; CylIntersection intersect;
           debugging.start = matrix * vec4( 0.0, -0.8, -0.2, 1.0f );
-          debugging.end = matrix * vec4( 0.0, 0.8, -0.2, 1.0f );
-          debugging.radius = 0.2;
+          debugging.end = matrix * vec4( -0.9, 0.8, -0.7, 1.0f );
+          debugging.radius = 0.05;
           PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
           HitCylinder( screen, start, direction, debugging, intersect );
           PhotonBeam b;
