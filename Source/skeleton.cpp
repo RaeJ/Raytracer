@@ -261,21 +261,28 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   PositionShader( screen, vec4(p_0_2,1.0f), vec3(0,1,1));
   PositionShader( screen, vec4(p_0_3,1.0f), vec3(0,1,1));
   PhotonBeam b;
-  b.start = vec4( SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  b.end = vec4( bot_right, 1.0f );
-  DrawBeam( screen, b, vec3(1, 0, 0) );
-  b.start = vec4( SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  b.end = vec4( top_right, 1.0f );
-  DrawBeam( screen, b, vec3(1, 0, 0) );
-  b.start = vec4( -SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  b.end = vec4( top_left, 1.0f );
-  DrawBeam( screen, b, vec3(1, 0, 0) );
-  b.start = vec4( -SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  b.end = vec4( bot_left, 1.0f );
-  DrawBeam( screen, b, vec3(1, 0, 0) );
+  // b.start = vec4( SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  // b.end = vec4( bot_right, 1.0f );
+  // DrawBeam( screen, b, vec3(1, 0, 0) );
+  // b.start = vec4( SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  // b.end = vec4( top_right, 1.0f );
+  // DrawBeam( screen, b, vec3(1, 0, 0) );
+  // b.start = vec4( -SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  // b.end = vec4( top_left, 1.0f );
+  // DrawBeam( screen, b, vec3(1, 0, 0) );
+  // b.start = vec4( -SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  // b.end = vec4( bot_left, 1.0f );
+  // DrawBeam( screen, b, vec3(1, 0, 0) );
   b.start = matrix * c_top_left;
-  b.end = vec4( 0, -camera.z/2.0f, camera.z, 1.0f );
+  // b.end = vec4( 0, (-camera.z/2.0f) , camera.z, 1.0f );
+  // b.end = matrix * vec4( 0, 0, -5, 1.0f );
+  // b.end = matrix * vec4( 0, -3, -5, 1.0f );
+  // b.end = matrix * vec4( 0, camera.z/2.0f, camera.z, 1.0f );
+  b.end = matrix * vec4( 0, 0, camera.z, 1.0f );
   DrawBeam( screen, b, vec3(0, 1, 0) );
+  PositionShader( screen, (b.start + b.end)/2.0f, vec3(1,0,0));
+  PositionShader( screen, b.start, vec3(0,0,1));
+  PositionShader( screen, b.end, vec3(1,0,1));
 }
 
 /*Place updates of parameters here*/
@@ -644,7 +651,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      vec3 top_right = vec3( matrix * vec4( 1, -1, -1, 1 ) );
      vec3 bot_left  = vec3( matrix * vec4( -1, 1, -1, 1 ) );
      vec3 bot_right = vec3( matrix * vec4( 1, 1, -1, 1 ) );
-     vec3 p_0_0     = ( top_left + top_right ) / 4.0f;
+     vec3 p_0_0     = ( top_left + top_right ) / 2.0f;
      vec3 p_0_1     = ( top_right + bot_right ) / 4.0f;
      vec3 p_0_2     = ( bot_right + bot_left ) / 4.0f;
      vec3 p_0_3     = ( bot_left + top_left ) / 4.0f;
