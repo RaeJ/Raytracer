@@ -14,7 +14,7 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-#define BOUNCES 8
+#define BOUNCES 3
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -42,6 +42,7 @@ struct PhotonSeg
 
 struct CylIntersection
 {
+  bool valid;
   float tb_minus;
   float tb_plus;
   float tc_minus;
@@ -96,7 +97,7 @@ float m = std::numeric_limits<float>::max();
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-0.8,-0.4,1);
+vec4 light_position(0,-0.5,-0.7,1);
 vec3 light_power = 0.005f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
@@ -168,20 +169,14 @@ float Transmittance( float length, float ext );
 float Integral_721( float tc_m, float tc_p, float tb_p, float extinction );
 mat3 findRotationMatrix( vec3 current_dir,
                          vec3 wanted_dir );
-void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current );
+bool intersectPlane( const vec3& n,
+                     const vec3& p0,
+                     const vec3& l0,
+                     const vec3& l,
+                     float& t ) ;
 
-void Testing( screen* screen, vec4 start, vec4 dir, Node* parent, vec3 current ){
-  mat4 matrix;  TransformationMatrix( matrix );
-  mat4 inv = glm::inverse( matrix );
 
-  AABB box = parent->aabb;
-  DrawBoundingBox( screen, box );
-  vec4 hit;
-  if( HitBoundingBox( box, start, dir, hit ) ){
-    PhotonBeam b; b.start = inv * start; b.end = hit;
-    DrawBeam( screen, b, vec3(0,0,0) );
-  }
-}
+// ------------------------------------------------------------------------- //
 
 int main( int argc, char* argv[] )
 {
@@ -193,7 +188,7 @@ int main( int argc, char* argv[] )
   LoadTestModel( triangles );
 
   cout << "Casting photons" << endl;
-  rroot = CastPhotonBeams( 100, beams );
+  rroot = CastPhotonBeams( 1000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -220,7 +215,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
-  memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
+  // memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
   bool has_hit = true;
   // Drawing stage
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
@@ -247,6 +242,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
         PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
       }
     }
+    SDL_Renderframe(screen);
   }
 }
 
@@ -507,14 +503,27 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
 
   vec3 energy    = light_power;
 
-  for( int i=0; i<number; i++ ){
-    vec4 direction = FindDirection( origin, centre, radius );
-    direction = glm::normalize( direction );
+  // for( int i=0; i<number; i++ ){
+  //   vec4 direction = FindDirection( origin, centre, radius );
+  //   direction = glm::normalize( direction );
+  //
+  //   float offset = uniform( generator ) * 0.1;
+  //   float r      = uniform_small( generator );
+  //   CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
+  // }
 
-    float offset = uniform( generator ) * 0.1;
-    float r      = uniform_small( generator );
-    CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, r );
-  }
+  for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
+    {
+        for (double theta = 0.; theta < PI; theta += PI/20.) // Elevation [0, PI]
+        {
+            float x        = cos(phi) * sin(theta);
+            float y        = sin(phi) * sin(theta);
+            float z        =            cos(theta);
+            vec4 direction = glm::normalize( vec4( x, y, z, 1.0f ) );
+            float offset   = 0.0f;
+            CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
+        }
+    }
 
   AABB root;
   root.min = min_point;
@@ -522,6 +531,19 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   root.mid = ( min_point + max_point ) / 2.0f;
 
   return root;
+}
+
+bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l, float &t)
+{
+    // assuming vectors are all normalized
+    float denom = glm::dot(n, l);
+    if (denom > 1e-6) {
+        vec3 p0l0 = p0 - l0;
+        t = glm::dot(p0l0, n) / denom;
+        return (t >= 0);
+    }
+
+    return false;
 }
 
 void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
@@ -538,7 +560,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.index_hit = hit.index;
 
      beam.start     = origin + beam.offset;
-     beam.end       = hit.position - beam.offset;
+     beam.end       = hit.position;
 
      beams.push_back( beam );
 
@@ -568,8 +590,8 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      float scattered  = uniform( generator );
      if( scattered <= ( scattering_c / extinction_c ) ){
        float t_s         = diff * uniform( generator );
-       // TODO: check incoming direction is already normalised
-       vec4 start        = origin + ( t_s * direction );
+       vec4 direc        = vec4( glm::normalize( vec3( direction ) ), 0 );
+       vec4 start        = origin + ( t_s * direc );
        float the         = 2 * PI * uniform( generator );
        float phi         = acos(1 - 2 * uniform( generator ) );
        float x           = sin( phi ) * cos( the );
@@ -584,18 +606,65 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      }
 
    } else {
-     cout << "Direction does not terminate\n";
+     mat4 matrix;  TransformationMatrix( matrix );
+     vec3 top_left  = vec3( matrix * vec4( -1, -1, -1, 1 ) );
+     vec3 top_right = vec3( matrix * vec4( 1, -1, -1, 1 ) );
+     vec3 bot_left  = vec3( matrix * vec4( -1, 1, -1, 1 ) );
+     vec3 bot_right = vec3( matrix * vec4( 1, 1, -1, 1 ) );
+     vec3 p_0_0     = ( top_left + top_right ) / 4.0f;
+     vec3 p_0_1     = ( top_right + bot_right ) / 4.0f;
+     vec3 p_0_2     = ( bot_right + bot_left ) / 4.0f;
+     vec3 p_0_3     = ( bot_left + top_left ) / 4.0f;
+     vec3 n_0_0     = glm::normalize( glm::cross( top_left, top_right ) );
+     vec3 n_0_1     = glm::normalize( glm::cross( top_right, bot_right ) );
+     vec3 n_0_2     = glm::normalize( glm::cross( bot_right, bot_left ) );
+     vec3 n_0_3     = glm::normalize( glm::cross( bot_left, top_left ) );
+     vec3 dir       = glm::normalize( vec3( direction ) );
+     vec3 start     = vec3( origin );
+
+     float t;
+     PhotonBeam beam;
+     beam.offset    = offset;
+     beam.radius    = radius;
+     beam.energy    = energy;
+     beam.start     = origin + beam.offset;
+     beam.index_hit = -1;
+
+     if( intersectPlane( n_0_0, p_0_0, start, dir, t ) ){
+       // Intersects with top
+       beam.end       = vec4( start + ( t * dir ), 1.0f );
+     } else if( intersectPlane( n_0_1, p_0_1, start, dir, t ) ){
+       // Intersects with right
+       beam.end       = vec4( start + ( t * dir ), 1.0f );
+     } else if( intersectPlane( n_0_2, p_0_2, start, dir, t ) ){
+       // Intersects with bottom
+       beam.end       = vec4( start + ( t * dir ), 1.0f );
+     } else if( intersectPlane( n_0_3, p_0_3, start, dir, t ) ){
+       // Intersects with left
+       beam.end       = vec4( start + ( t * dir ), 1.0f );
+     } else {
+       cout << "No intersection found" << endl;
+       return;
+     }
+     beams.push_back( beam );
+
+     max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
+     max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
+     max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
+     min_point.x = fmin( beam.end.x, fmin( beam.start.x, min_point.x ) );
+     min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
+     min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
    }
 
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
-  float r1 = uniform( generator );
-  float r2 = uniform( generator );
-  float t = 2 * PI * r1;
-  float p = sqrt( r2 );
-  float x = centre.x + ( p * cos( t ) );
-  float z = centre.z + ( p * sin( t ) );
+  float r1  = uniform( generator );
+  float r2  = uniform( generator );
+  float the = 2 * PI * r1;
+  float phi = sqrt( r2 );
+  float x = centre.x + ( phi * cos( the ) );
+  float z = centre.z + ( phi * sin( the ) );
   float y = centre.y + sqrt( 1 - r2 );
   vec4 position( x, y, z, 1.0f );
 
@@ -652,7 +721,6 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
       // Pixel h; Vertex vh; vh.position = hit;
       // VertexShader( vh, h );
       // PixelShader( screen, h.x, h.y, vec3(1,1,1) );
-
       float hit_distance = glm::length( hit - start );
       if( hit_distance <= max_distance ){
         PhotonSeg segments[2];
@@ -663,14 +731,16 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
           if( seg.id != -1 ){
             CylIntersection intersect;
             if( HitCylinder( start, dir, seg, intersect ) ){
-              float _int     = Integral_721( intersect.tc_minus,
-                                             intersect.tc_plus,
-                                             intersect.tb_plus,
-                                             extinction_c );
-              float phase_f  = 1 / ( 4 * PI );
-              float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+              if( intersect.valid ){
+                float _int     = Integral_721( intersect.tc_minus,
+                                               intersect.tc_plus,
+                                               intersect.tb_plus,
+                                               extinction_c );
+                float phase_f  = 1 / ( 4 * PI );
+                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
-              current += beams[seg.id].energy * phase_f * rad * _int;
+                current += beams[seg.id].energy * phase_f * rad * _int;
+              }
             }
           }
         }
@@ -695,14 +765,16 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
           if( seg.id != -1 ){
             CylIntersection intersect;
             if( HitCylinder( start, dir, seg, intersect ) ){
-              float _int     = Integral_721( intersect.tc_minus,
-                                             intersect.tc_plus,
-                                             intersect.tb_plus,
-                                             extinction_c );
-              float phase_f  = 1 / ( 4 * PI );
-              float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+              if( intersect.valid ){
+                float _int     = Integral_721( intersect.tc_minus,
+                                               intersect.tc_plus,
+                                               intersect.tb_plus,
+                                               extinction_c );
+                float phase_f  = 1 / ( 4 * PI );
+                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
-              current += beams[seg.id].energy * phase_f * rad * _int;
+                current += beams[seg.id].energy * phase_f * rad * _int;
+              }
             }
           }
         }
@@ -905,6 +977,7 @@ bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       }
     }
     if( ( t0 > 0 ) && ( t1 > 0 ) && ( t1 > t0 ) ){
+      intersection.valid       = true;
       intersection.tb_minus    = first_hit.y / S_inv;
       intersection.tb_plus     = second_hit.y / S_inv;
       intersection.tc_minus    = t0 / S_inv;
@@ -913,6 +986,8 @@ bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       intersection.exit_point  = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
       intersection.entry_normal= ( glm::inverse( R_inv ) * ( first_normal ) );
       intersection.exit_normal = ( glm::inverse( R_inv ) * ( second_normal ) );
+    } else {
+      intersection.valid       = false;
     }
     return first_inte;
 }
