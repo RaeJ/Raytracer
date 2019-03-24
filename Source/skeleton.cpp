@@ -95,7 +95,7 @@ vector<PhotonSeg> segments;
 
 float m = std::numeric_limits<float>::max();
 
-vec4 camera(0, 0, -3, 1.0);
+vec4 camera(0, 0, -5, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 vec4 light_position(0,-0.5,-0.7,1);
 vec3 light_power = 0.005f * vec3( 1, 1, 1 );
@@ -117,6 +117,7 @@ Node* root;
 float absorption_c = 0.035;
 float scattering_c = 0.005;
 float extinction_c = absorption_c + scattering_c;
+vec4 current_pos = camera;
 
 // float absorption_c = 0.35;
 // float scattering_c = 0.05;
@@ -203,6 +204,7 @@ int main( int argc, char* argv[] )
       Update();
       Draw( screen, beams, items );
       SDL_Renderframe(screen);
+      current_pos = camera;
     }
 
   SDL_SaveImage( screen, "screenshot.bmp" );
@@ -216,7 +218,6 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   mat4 matrix;  TransformationMatrix(matrix);
   /* Clear buffer */
   // memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
-  bool has_hit = true;
   // Drawing stage
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
@@ -238,12 +239,43 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
             BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
           }
         }
-        // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
-        PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+        PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
+        // PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
       }
     }
-    SDL_Renderframe(screen);
+    // SDL_Renderframe(screen);
   }
+  vec4 c_top_left  = ( vec4( -1, -1, -1, 1 ) + vec4( 1, -1, -1, 1 ) ) / 2.0f;
+  vec4 screen_left = ( vec4( 0, -SCREEN_HEIGHT/2.0f, -camera.z, 1) );
+  vec3 top_left  = vec3( matrix * vec4( -1, -1, -1, 1 ) );
+  vec3 top_right = vec3( matrix * vec4( 1, -1, -1, 1 ) );
+  vec3 bot_left  = vec3( matrix * vec4( -1, 1, -1, 1 ) );
+  vec3 bot_right = vec3( matrix * vec4( 1, 1, -1, 1 ) );
+  vec3 camera_loc= vec3( matrix * camera );
+  vec3 p_0_0     = vec3( ( ( matrix * c_top_left ) + ( matrix * screen_left ) ) / 2.0f );
+  vec3 p_0_1     = ( top_right + bot_right ) / 2.0f;
+  vec3 p_0_2     = ( bot_right + bot_left ) / 2.0f;
+  vec3 p_0_3     = ( bot_left + top_left ) / 2.0f;
+  PositionShader( screen, vec4(p_0_0,1.0f), vec3(1,0,1));
+  PositionShader( screen, vec4(p_0_1,1.0f), vec3(0,1,1));
+  PositionShader( screen, vec4(p_0_2,1.0f), vec3(0,1,1));
+  PositionShader( screen, vec4(p_0_3,1.0f), vec3(0,1,1));
+  PhotonBeam b;
+  b.start = vec4( SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  b.end = vec4( bot_right, 1.0f );
+  DrawBeam( screen, b, vec3(1, 0, 0) );
+  b.start = vec4( SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  b.end = vec4( top_right, 1.0f );
+  DrawBeam( screen, b, vec3(1, 0, 0) );
+  b.start = vec4( -SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  b.end = vec4( top_left, 1.0f );
+  DrawBeam( screen, b, vec3(1, 0, 0) );
+  b.start = vec4( -SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
+  b.end = vec4( bot_left, 1.0f );
+  DrawBeam( screen, b, vec3(1, 0, 0) );
+  b.start = matrix * c_top_left;
+  b.end = vec4( 0, -camera.z/2.0f, camera.z, 1.0f );
+  DrawBeam( screen, b, vec3(0, 1, 0) );
 }
 
 /*Place updates of parameters here*/
@@ -552,6 +584,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    Intersection hit;
    if( ClosestIntersection( origin, direction, hit ) ){
+     return;
      PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
      beam.offset    = offset;
