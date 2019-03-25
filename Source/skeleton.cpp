@@ -14,7 +14,7 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-#define BOUNCES 3
+#define BOUNCES 8
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -97,8 +97,8 @@ float m = std::numeric_limits<float>::max();
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-0.5,-0.7,1);
-vec3 light_power = 0.005f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.8,0.2,1);
+vec3 light_power = 0.01f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -114,14 +114,13 @@ std::uniform_real_distribution<double> uniform_circle(-1.0, 1.0);
 AABB rroot;
 Node* root;
 
-float absorption_c = 0.035;
-float scattering_c = 0.005;
-float extinction_c = absorption_c + scattering_c;
-vec4 current_pos = camera;
-
-// float absorption_c = 0.35;
-// float scattering_c = 0.05;
+// float absorption_c = 0.035;
+// float scattering_c = 0.005;
 // float extinction_c = absorption_c + scattering_c;
+
+float absorption_c = 0.01;
+float scattering_c = 0.0005;
+float extinction_c = absorption_c + scattering_c;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -189,7 +188,7 @@ int main( int argc, char* argv[] )
   LoadTestModel( triangles );
 
   cout << "Casting photons" << endl;
-  rroot = CastPhotonBeams( 5, beams );
+  rroot = CastPhotonBeams( 2000, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -204,7 +203,6 @@ int main( int argc, char* argv[] )
       Update();
       Draw( screen, beams, items );
       SDL_Renderframe(screen);
-      current_pos = camera;
     }
 
   SDL_SaveImage( screen, "screenshot.bmp" );
@@ -243,30 +241,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
         PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
       }
     }
-    // SDL_Renderframe(screen);
+    SDL_Renderframe(screen);
   }
-  vec4 c_top_left  = ( vec4( -1, -1, -1, 1 ) + vec4( 1, -1, -1, 1 ) ) / 2.0f;
-  vec4 screen_left = ( vec4( 0, -SCREEN_HEIGHT/2.0f, -camera.z, 1) );
-  vec3 top_left  = vec3( matrix * vec4( -1, -1, -1, 1 ) );
-  vec3 top_right = vec3( matrix * vec4( 1, -1, -1, 1 ) );
-  vec3 bot_left  = vec3( matrix * vec4( -1, 1, -1, 1 ) );
-  vec3 bot_right = vec3( matrix * vec4( 1, 1, -1, 1 ) );
-  vec3 camera_loc= vec3( matrix * camera );
-  vec3 p_0_0     = vec3( ( ( matrix * c_top_left ) + ( matrix * screen_left ) ) / 2.0f );
-  vec3 p_0_1     = ( top_right + bot_right ) / 2.0f;
-  vec3 p_0_2     = ( bot_right + bot_left ) / 2.0f;
-  vec3 p_0_3     = ( bot_left + top_left ) / 2.0f;
-  PositionShader( screen, vec4(p_0_0,1.0f), vec3(1,0,1));
-  PositionShader( screen, vec4(p_0_1,1.0f), vec3(0,1,1));
-  PositionShader( screen, vec4(p_0_2,1.0f), vec3(0,1,1));
-  PositionShader( screen, vec4(p_0_3,1.0f), vec3(0,1,1));
-  PhotonBeam b;
-  b.start = matrix * c_top_left;
-  b.end = matrix * vec4( 0, 0, camera.z, 1.0f );
-  DrawBeam( screen, b, vec3(0, 1, 0) );
-  PositionShader( screen, (b.start + b.end)/2.0f, vec3(1,0,0));
-  PositionShader( screen, b.start, vec3(0,0,1));
-  PositionShader( screen, b.end, vec3(1,0,1));
 }
 
 /*Place updates of parameters here*/
@@ -479,8 +455,6 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
         }
       }
 
-
-
       beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
 
       items.push_back( beam_seg );
@@ -522,8 +496,9 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin    = matrix * light_position;
   // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z-1, 1.0f );
-  float radius   = 0.4f;
+  vec4 centre    = vec4( origin.x, origin.y + 2, origin.z, 1.0f );
+  // TODO: make this radius value useful
+  float radius   = 0.05f;
 
   vec3 energy    = light_power;
 
@@ -565,7 +540,6 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l
     if ( abs( denom ) > 1e-6 ) {
         vec3 p0l0 = p0 - l0;
         t = glm::dot(p0l0, n) / denom;
-        cout << "t: " << t << endl;
         return ( t >= 0 );
     }
 
@@ -578,7 +552,6 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    Intersection hit;
    if( ClosestIntersection( origin, direction, hit ) ){
-     return;
      PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
      beam.offset    = offset;
@@ -668,7 +641,6 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.index_hit = -1;
 
      float t_min = m;
-     cout << "\n\nCheck: " << endl;
      if( intersectPlane( n_0_0, p_0_0, start, dir, t ) ){
        // Intersects with top
        if( t < t_min ) t_min = t;
@@ -689,7 +661,6 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        cout << "No intersection found" << endl;
        return;
      }
-     cout << "T min: " << t_min << endl;
      beam.end       = vec4( start + ( t_min * dir ), 1.0f );
      beams.push_back( beam );
 
