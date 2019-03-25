@@ -150,7 +150,7 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( screen* screen,
                    vec4 start,
                    vec4 dir,
-                   vec4& limit,
+                   const Intersection& limit,
                    Node* parent,
                    vec3& current,
                    vector<PhotonBeam>& beams
@@ -220,7 +220,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
       vec3 current = vec3( 0, 0, 0 );
-      vec3 colour  = vec3( 0, 0, 0 );
+      // vec3 colour  = vec3( 0, 0, 0 );
       for( int i = 0; i<SSAA; i++ ){
         for( int j = 0; j<SSAA; j++ ){
           float x_dir = ( x + i ) - ( (SCREEN_WIDTH * SSAA) / (float) 2 );
@@ -232,9 +232,9 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 
           direction = glm::normalize( direction );
           if( ClosestIntersection( start, direction, c_i ) ){
-            Triangle close = triangles[c_i.index];
-            colour = close.colour;
-            BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
+            // Triangle close = triangles[c_i.index];
+            // colour = close.colour;
+            BeamRadiance( screen, start, direction, c_i, root, current, beams );
           }
         }
         // PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
@@ -383,8 +383,6 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
     float cos_x  = glm::dot( abs( dir ), x_dir );
     float cos_y  = glm::dot( abs( dir ), y_dir );
 
-    Triangle tri = triangles[ b.index_hit ];
-
     // float step   = length;
     float step   = 0.2;
 
@@ -437,7 +435,8 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items ){
           beam_seg.max  = vec4( beam_seg.max.x + component.x,
                                 beam_seg.max.y + component.y,
                                 beam_seg.max.z - component.z, 1.0f );
-        } else {
+        } else if( b.index_hit != -1 ){
+          Triangle tri = triangles[ b.index_hit ];
           vec4 tri_normal = abs( tri.normal );
           if( tri_normal.x > ( tri_normal.y || tri_normal.z ) ){
             beam_seg.max  = vec4( beam_seg.max.x,
@@ -720,7 +719,7 @@ mat3 findRotationMatrix( vec3 c_unit_dir, vec3 w_unit_dir ){
 }
 
 // TODO: Check if the limit is working correctly
-void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* parent,
+void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& limit, Node* parent,
                    vec3& current, vector<PhotonBeam>& beams ){
   vec4 hit;
 
@@ -728,7 +727,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
   Node* right    = parent->right;
 
   mat4 matrix;  TransformationMatrix( matrix );
-  float max_distance  = glm::length( limit - start );
+  float max_distance  = glm::length( limit.position - start );
 
   if( left != NULL){
     AABB box_left  = left->aabb;
@@ -755,7 +754,17 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
                 float phase_f  = 1 / ( 4 * PI );
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
-                current += beams[seg.id].energy * phase_f * rad * _int;
+                PhotonBeam beam = beams[ seg.id ];
+                float error_1   = glm::length( intersect.entry_point -
+                                               vec3( limit.position ) );
+                float error_2   = glm::length( intersect.exit_point -
+                                               vec3( limit.position ) );
+                if( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ){
+                  vec3 pigment  = triangles[ limit.index ].colour;
+                  current        += beam.energy * phase_f * rad * pigment;
+                } else {
+                  current        += beam.energy * phase_f * rad * _int;
+                }
               }
             }
           }
@@ -789,7 +798,17 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, vec4& limit, Node* pare
                 float phase_f  = 1 / ( 4 * PI );
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
-                current += beams[seg.id].energy * phase_f * rad * _int;
+                PhotonBeam beam = beams[ seg.id ];
+                float error_1   = glm::length( intersect.entry_point -
+                                               vec3( limit.position ) );
+                float error_2   = glm::length( intersect.exit_point -
+                                               vec3( limit.position ) );
+                if( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ){
+                  vec3 pigment  = triangles[ limit.index ].colour;
+                  current        += beam.energy * phase_f * rad * pigment;
+                } else {
+                  current        += beam.energy * phase_f * rad * _int;
+                }
               }
             }
           }
