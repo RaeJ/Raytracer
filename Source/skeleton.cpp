@@ -97,8 +97,8 @@ float m = std::numeric_limits<float>::max();
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-0.8,0.2,1);
-vec3 light_power = 0.01f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.8,0.0,1);
+vec3 light_power = 0.005f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -496,7 +496,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin    = matrix * light_position;
   // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  vec4 centre    = vec4( origin.x, origin.y + 2, origin.z, 1.0f );
+  vec4 centre    = vec4( origin.x, origin.y + 1.5, origin.z, 1.0f );
   // TODO: make this radius value useful
   float radius   = 0.05f;
 
@@ -551,6 +551,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
                float offset, float radius ){
 
    Intersection hit;
+   float diff;
    if( ClosestIntersection( origin, direction, hit ) ){
      PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
@@ -571,7 +572,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      min_point.y = fmin( beam.end.y, fmin( beam.start.y, min_point.y ) );
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
 
-     float diff  = glm::length( vec3( hit.position - origin ) );
+     diff        = glm::length( vec3( hit.position - origin ) );
 
      if( bounce < BOUNCES ){
        // float rand            =  dis( gen ) * 0.01;
@@ -586,25 +587,6 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams, 0.0f, radius );
      }
-
-     float scattered  = uniform( generator );
-     if( scattered <= ( scattering_c / extinction_c ) ){
-       float t_s         = diff * uniform( generator );
-       vec4 direc        = vec4( glm::normalize( vec3( direction ) ), 0 );
-       vec4 start        = origin + ( t_s * direc );
-       float the         = 2 * PI * uniform( generator );
-       float phi         = acos(1 - 2 * uniform( generator ) );
-       float x           = sin( phi ) * cos( the );
-       float y           = sin( phi ) * sin( the );
-       float z           = cos( phi );
-       vec3 dir          = glm::normalize( vec3( x, y, z ) );
-       vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
-       float transmitted = Transmittance( t_s, extinction_c );
-       vec3 new_energy   = energy * transmitted;
-       CastBeam( bounce, new_energy, start, dir_sample,
-                 min_point, max_point, beams, 0.0f, radius );
-     }
-
    } else {
      mat4 matrix;  TransformationMatrix( matrix );
      vec4 top_left  = vec4( -1, -1, -1, 1 );
@@ -630,7 +612,6 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
                                       vec3( ( matrix * bot_left ) - left ) ) );
      vec3 dir       = glm::normalize( vec3( direction ) );
      vec3 start     = vec3( origin );
-     vec3 debug     = vec3( matrix * bot_right );
 
      float t;
      PhotonBeam beam;
@@ -664,6 +645,8 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.end       = vec4( start + ( t_min * dir ), 1.0f );
      beams.push_back( beam );
 
+     diff        = glm::length( vec3( beam.end - beam.start ) );
+
      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
      max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
      max_point.z = fmin( beam.end.z, fmin( beam.start.z, max_point.z ) );
@@ -672,6 +655,23 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
    }
 
+   float scattered  = uniform( generator );
+   if( scattered <= ( scattering_c / extinction_c ) ){
+     float t_s         = diff * uniform( generator );
+     vec4 direc        = vec4( glm::normalize( vec3( direction ) ), 0 );
+     vec4 start        = origin + ( t_s * direc );
+     float the         = 2 * PI * uniform( generator );
+     float phi         = acos(1 - 2 * uniform( generator ) );
+     float x           = sin( phi ) * cos( the );
+     float y           = sin( phi ) * sin( the );
+     float z           = cos( phi );
+     vec3 dir          = glm::normalize( vec3( x, y, z ) );
+     vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
+     float transmitted = Transmittance( t_s, extinction_c );
+     vec3 new_energy   = energy * transmitted;
+     CastBeam( bounce, new_energy, start, dir_sample,
+               min_point, max_point, beams, 0.0f, radius );
+   }
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
