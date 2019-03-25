@@ -95,7 +95,7 @@ vector<PhotonSeg> segments;
 
 float m = std::numeric_limits<float>::max();
 
-vec4 camera(0, 0, -5, 1.0);
+vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
 vec4 light_position(0,-0.5,-0.7,1);
 vec3 light_power = 0.005f * vec3( 1, 1, 1 );
@@ -189,7 +189,7 @@ int main( int argc, char* argv[] )
   LoadTestModel( triangles );
 
   cout << "Casting photons" << endl;
-  rroot = CastPhotonBeams( 1000, beams );
+  rroot = CastPhotonBeams( 5, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -239,8 +239,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
             BeamRadiance( screen, start, direction, c_i.position, root, current, beams );
           }
         }
-        PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
-        // PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+        // PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
+        PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
       }
     }
     // SDL_Renderframe(screen);
@@ -261,25 +261,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   PositionShader( screen, vec4(p_0_2,1.0f), vec3(0,1,1));
   PositionShader( screen, vec4(p_0_3,1.0f), vec3(0,1,1));
   PhotonBeam b;
-  // b.start = vec4( SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  // b.end = vec4( bot_right, 1.0f );
-  // DrawBeam( screen, b, vec3(1, 0, 0) );
-  // b.start = vec4( SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  // b.end = vec4( top_right, 1.0f );
-  // DrawBeam( screen, b, vec3(1, 0, 0) );
-  // b.start = vec4( -SCREEN_WIDTH/2.0f, -SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  // b.end = vec4( top_left, 1.0f );
-  // DrawBeam( screen, b, vec3(1, 0, 0) );
-  // b.start = vec4( -SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f, -camera.z, 1.0f );
-  // b.end = vec4( bot_left, 1.0f );
-  // DrawBeam( screen, b, vec3(1, 0, 0) );
   b.start = matrix * c_top_left;
-  // b.end = vec4( 0, (-camera.z/2.0f) , camera.z, 1.0f );
-  // b.end = matrix * vec4( 0, 0, -5, 1.0f );
-  // b.end = matrix * vec4( 0, -3, -5, 1.0f );
-  // b.end = matrix * vec4( 0, camera.z/2.0f, camera.z, 1.0f );
-  
-  // TODO: work out why no intersections were found seeing as this was the coordinate you used
   b.end = matrix * vec4( 0, 0, camera.z, 1.0f );
   DrawBeam( screen, b, vec3(0, 1, 0) );
   PositionShader( screen, (b.start + b.end)/2.0f, vec3(1,0,0));
@@ -539,32 +521,33 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
 
   mat4 matrix;  TransformationMatrix( matrix );
   vec4 origin    = matrix * light_position;
-  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z-1, 1.0f );
   float radius   = 0.4f;
 
   vec3 energy    = light_power;
 
-  // for( int i=0; i<number; i++ ){
-  //   vec4 direction = FindDirection( origin, centre, radius );
-  //   direction = glm::normalize( direction );
-  //
-  //   float offset = uniform( generator ) * 0.1;
-  //   float r      = uniform_small( generator );
-  //   CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
-  // }
+  for( int i=0; i<number; i++ ){
+    vec4 direction = FindDirection( origin, centre, radius );
+    direction = glm::normalize( direction );
 
-  for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
-    {
-        for (double theta = 0.; theta < PI; theta += PI/20.) // Elevation [0, PI]
-        {
-            float x        = cos(phi) * sin(theta);
-            float y        = sin(phi) * sin(theta);
-            float z        =            cos(theta);
-            vec4 direction = glm::normalize( vec4( x, y, z, 1.0f ) );
-            float offset   = 0.0f;
-            CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
-        }
-    }
+    float offset = uniform( generator ) * 0.1;
+    float r      = uniform_small( generator );
+    CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
+  }
+
+  // for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
+  //   {
+  //       for (double theta = 0.; theta < PI; theta += PI/20.) // Elevation [0, PI]
+  //       {
+  //           float x        = cos(phi) * sin(theta);
+  //           float y        = sin(phi) * sin(theta);
+  //           float z        =            cos(theta);
+  //           vec4 direction = glm::normalize( vec4( x, y, z, 1.0f ) );
+  //           float offset   = 0.0f;
+  //           CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
+  //       }
+  //   }
 
   AABB root;
   root.min = min_point;
@@ -577,11 +560,13 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams ){
 bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l, float &t)
 {
     // assuming vectors are all normalized
-    float denom = glm::dot(n, l);
-    if (denom > 1e-6) {
+    float denom = glm::dot( n, l );
+    // Note, needed to make use of the abs() function
+    if ( abs( denom ) > 1e-6 ) {
         vec3 p0l0 = p0 - l0;
         t = glm::dot(p0l0, n) / denom;
-        return (t >= 0);
+        cout << "t: " << t << endl;
+        return ( t >= 0 );
     }
 
     return false;
@@ -649,20 +634,30 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    } else {
      mat4 matrix;  TransformationMatrix( matrix );
-     vec3 top_left  = vec3( matrix * vec4( -1, -1, -1, 1 ) );
-     vec3 top_right = vec3( matrix * vec4( 1, -1, -1, 1 ) );
-     vec3 bot_left  = vec3( matrix * vec4( -1, 1, -1, 1 ) );
-     vec3 bot_right = vec3( matrix * vec4( 1, 1, -1, 1 ) );
-     vec3 p_0_0     = ( top_left + top_right ) / 2.0f;
-     vec3 p_0_1     = ( top_right + bot_right ) / 4.0f;
-     vec3 p_0_2     = ( bot_right + bot_left ) / 4.0f;
-     vec3 p_0_3     = ( bot_left + top_left ) / 4.0f;
-     vec3 n_0_0     = glm::normalize( glm::cross( top_left, top_right ) );
-     vec3 n_0_1     = glm::normalize( glm::cross( top_right, bot_right ) );
-     vec3 n_0_2     = glm::normalize( glm::cross( bot_right, bot_left ) );
-     vec3 n_0_3     = glm::normalize( glm::cross( bot_left, top_left ) );
+     vec4 top_left  = vec4( -1, -1, -1, 1 );
+     vec4 top_right = vec4( 1, -1, -1, 1 );
+     vec4 bot_left  = vec4( -1, 1, -1, 1 );
+     vec4 bot_right = vec4( 1, 1, -1, 1 );
+     vec4 converge  = matrix * vec4( 0, 0, camera.z, 1.0f );
+     vec4 top       = vec4( matrix * ( ( top_left + top_right ) / 2.0f ) );
+     vec4 right     = vec4( matrix * ( ( top_right + bot_right ) / 2.0f ) );
+     vec4 bot       = vec4( matrix * ( ( bot_right + bot_left ) / 2.0f ) );
+     vec4 left      = vec4( matrix * ( ( bot_left + top_left ) / 2.0f ) );
+     vec3 p_0_0     = vec3( ( top + converge ) / 2.0f );
+     vec3 p_0_1     = vec3( ( right + converge ) / 2.0f );
+     vec3 p_0_2     = vec3( ( bot + converge ) / 2.0f );
+     vec3 p_0_3     = vec3( ( left + converge ) / 2.0f );
+     vec3 n_0_0     = glm::normalize( glm::cross( p_0_0 - vec3( top ),
+                                      vec3( ( matrix * top_left ) - top ) ) );
+     vec3 n_0_1     = glm::normalize( glm::cross( p_0_1 - vec3( right ),
+                                      vec3( ( matrix * top_right ) - right ) ) );
+     vec3 n_0_2     = glm::normalize( glm::cross( p_0_2 - vec3( bot ),
+                                      vec3( ( matrix * bot_right ) - bot ) ) );
+     vec3 n_0_3     = glm::normalize( glm::cross( p_0_3 - vec3( left ),
+                                      vec3( ( matrix * bot_left ) - left ) ) );
      vec3 dir       = glm::normalize( vec3( direction ) );
      vec3 start     = vec3( origin );
+     vec3 debug     = vec3( matrix * bot_right );
 
      float t;
      PhotonBeam beam;
@@ -672,22 +667,30 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.start     = origin + beam.offset;
      beam.index_hit = -1;
 
+     float t_min = m;
+     cout << "\n\nCheck: " << endl;
      if( intersectPlane( n_0_0, p_0_0, start, dir, t ) ){
        // Intersects with top
-       beam.end       = vec4( start + ( t * dir ), 1.0f );
-     } else if( intersectPlane( n_0_1, p_0_1, start, dir, t ) ){
+       if( t < t_min ) t_min = t;
+     }
+     if( intersectPlane( n_0_1, p_0_1, start, dir, t ) ){
        // Intersects with right
-       beam.end       = vec4( start + ( t * dir ), 1.0f );
-     } else if( intersectPlane( n_0_2, p_0_2, start, dir, t ) ){
+       if( t < t_min ) t_min = t;
+     }
+     if( intersectPlane( n_0_2, p_0_2, start, dir, t ) ){
        // Intersects with bottom
-       beam.end       = vec4( start + ( t * dir ), 1.0f );
-     } else if( intersectPlane( n_0_3, p_0_3, start, dir, t ) ){
+       if( t < t_min ) t_min = t;
+     }
+     if( intersectPlane( n_0_3, p_0_3, start, dir, t ) ){
        // Intersects with left
-       beam.end       = vec4( start + ( t * dir ), 1.0f );
-     } else {
+       if( t < t_min ) t_min = t;
+     }
+     if( t_min == m ){
        cout << "No intersection found" << endl;
        return;
      }
+     cout << "T min: " << t_min << endl;
+     beam.end       = vec4( start + ( t_min * dir ), 1.0f );
      beams.push_back( beam );
 
      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
