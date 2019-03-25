@@ -14,8 +14,8 @@ using glm::mat4;
 using glm::ivec2;
 
 
-#define SCREEN_WIDTH 512
-#define SCREEN_HEIGHT 512
+#define SCREEN_WIDTH 256
+#define SCREEN_HEIGHT 256
 #define FULLSCREEN_MODE false
 #define PI 3.14159265
 #define SSAA 1

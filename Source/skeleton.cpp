@@ -278,6 +278,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   // b.end = matrix * vec4( 0, 0, -5, 1.0f );
   // b.end = matrix * vec4( 0, -3, -5, 1.0f );
   // b.end = matrix * vec4( 0, camera.z/2.0f, camera.z, 1.0f );
+  
+  // TODO: work out why no intersections were found seeing as this was the coordinate you used
   b.end = matrix * vec4( 0, 0, camera.z, 1.0f );
   DrawBeam( screen, b, vec3(0, 1, 0) );
   PositionShader( screen, (b.start + b.end)/2.0f, vec3(1,0,0));
