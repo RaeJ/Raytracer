@@ -97,7 +97,7 @@ float m = std::numeric_limits<float>::max();
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-0.8,0.0,1);
+vec4 light_position(0,-0.9,-0.2,1);
 vec3 light_power = 0.005f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
