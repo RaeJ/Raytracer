@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
-#include "Tessendorf.h"
 #include "CastPhotons.h"
 
 using namespace std;
@@ -77,6 +76,7 @@ mat3 findRotationMatrix( vec3 current_dir,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
+  CreateSurface( 10, -0.6, 1.004 );
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -117,7 +117,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
       vec3 current = vec3( 0, 0, 0 );
-      // vec3 colour  = vec3( 0, 0, 0 );
+      vec3 colour  = vec3( 0, 0, 0 );
       for( int i = 0; i<SSAA; i++ ){
         for( int j = 0; j<SSAA; j++ ){
           float x_dir = ( x + i ) - ( (SCREEN_WIDTH * SSAA) / (float) 2 );
@@ -129,13 +129,13 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 
           direction = glm::normalize( direction );
           if( ClosestIntersection( start, direction, c_i, matrix, triangles ) ){
-            // Triangle close = triangles[c_i.index];
-            // colour = close.colour;
-            BeamRadiance( screen, start, direction, c_i, root, current, beams );
+            Triangle close = triangles[c_i.index];
+            colour = close.colour;
+            // BeamRadiance( screen, start, direction, c_i, root, current, beams );
           }
         }
-        // PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
-        PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+        PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
+        // PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
       }
     }
     SDL_Renderframe(screen);
