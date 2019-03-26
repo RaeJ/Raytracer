@@ -5,7 +5,6 @@
 #include "TestModelH.h"
 #include <stdint.h>
 #include <stdlib.h>
-#include "rasteriser.h"
 #include <math.h>
 #include "Tessendorf.h"
 #include "CastPhotons.h"
@@ -60,9 +59,6 @@ bool HitCylinder( const vec4 start,
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
-void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour );
-void DrawBoundedBeams( screen* screen, vector<AABB> items );
-void DrawTree( Node* parent, screen* screen );
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 void BeamRadiance( screen* screen,
                    vec4 start,
@@ -158,33 +154,6 @@ void Update()
   // std::cout << "Render time: " << dt << " ms." << std::endl;
   /* Update variables*/
   UserInput();
-}
-
-void DrawBoundedBeams( screen* screen, vector<AABB>& items ){
-  for( int i = 0; i<items.size(); i++ ){
-    DrawBoundingBox( screen, items[i] );
-  }
-}
-
-void DrawTree( Node* parent, screen* screen ){
-  AABB box = parent->aabb;
-  DrawBoundingBox( screen, box );
-  if( parent->left != NULL ){
-    DrawTree( parent->left, screen );
-  }
-  if( parent->right != NULL ){
-    DrawTree( parent->right, screen );
-  }
-}
-
-void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
-  Pixel proj1; Vertex v1; v1.position = b.start;
-  Pixel proj2; Vertex v2; v2.position = b.end;
-  VertexShader( v1, proj1 );
-  VertexShader( v2, proj2 );
-  DrawLine( screen, v1, v2, colour );
-  // PixelShader( screen, proj1.x, proj1.y, vec3(0,1,0) );
-  // PixelShader( screen, proj2.x, proj2.y, vec3(1,0,0) );
 }
 
 float Integral_721( float tc_m, float tc_p, float tb_p, float extinction ){

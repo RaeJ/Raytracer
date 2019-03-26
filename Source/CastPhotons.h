@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include "TestModelH.h"
+#include "rasteriser.h"
 
 // -------------------------------------------------------------------------- //
 // STRUCTS
@@ -28,6 +29,13 @@ struct PhotonSeg
   vec4 max;
   float radius;
   int id;
+};
+
+struct AABB
+{
+  vec4 max;
+  vec4 min;
+  vec4 mid;
 };
 
 struct Node
@@ -127,6 +135,16 @@ bool intersectPlane( const vec3& n,
                     float& t ) ;
 float Transmittance( float length, float ext );
 
+// -------------------------------------------------------------------------- //
+// DRAWING FUNCTIONS
+
+void DrawBoundedBeams( screen* screen, vector<AABB> items );
+void DrawBoundingBox( screen* screen, AABB bound );
+void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour );
+void DrawTree( Node* parent, screen* screen );
+
+// -------------------------------------------------------------------------- //
+// IMPLEMENTATION
 
 bool ClosestIntersection( vec4 start, vec4 dir,
                          Intersection &closestIntersections,
@@ -572,5 +590,70 @@ float Transmittance( float length, float ext ){
   float power     = - ext * length;
   return exp( power );
 }
+
+// -------------------------------------------------------------------------- //
+// DRAWING FUNCTIONS
+
+void DrawBoundingBox( screen* screen, AABB bound ){
+  vector<Vertex> vertices(4);
+  vec4 max  = bound.max;
+  vec4 min  = bound.min;
+
+  vertices[0].position  = max;
+  vertices[1].position  = vec4( min.x, max.y, max.z, 1.0f );
+  vertices[2].position  = vec4( min.x, min.y, max.z, 1.0f );
+  vertices[3].position  = vec4( max.x, min.y, max.z, 1.0f );
+
+  ComputePolygonEdges( screen, vertices );
+
+  vector<Vertex> vertices_1(4);
+  vertices_1[0].position  = vec4( max.x, max.y, min.z, 1.0f );
+  vertices_1[1].position  = vec4( min.x, max.y, min.z, 1.0f );
+  vertices_1[2].position  = min;
+  vertices_1[3].position  = vec4( max.x, min.y, min.z, 1.0f );
+
+  ComputePolygonEdges( screen, vertices_1 );
+
+  DrawLine( screen, vertices[0], vertices_1[0], purple );
+  DrawLine( screen, vertices[1], vertices_1[1], purple );
+  DrawLine( screen, vertices[2], vertices_1[2], purple );
+  DrawLine( screen, vertices[3], vertices_1[3], purple );
+
+  Pixel proj1; Vertex min_v; min_v.position = min;
+  Pixel proj2; Vertex max_v; max_v.position = max;
+
+  VertexShader( min_v, proj1 );
+  VertexShader( max_v, proj2 );
+  PixelShader( screen, proj1.x, proj1.y, white );
+  PixelShader( screen, proj2.x, proj2.y, black );
+}
+
+void DrawBoundedBeams( screen* screen, vector<AABB>& items ){
+  for( int i = 0; i<items.size(); i++ ){
+    DrawBoundingBox( screen, items[i] );
+  }
+}
+
+void DrawTree( Node* parent, screen* screen ){
+  AABB box = parent->aabb;
+  DrawBoundingBox( screen, box );
+  if( parent->left != NULL ){
+    DrawTree( parent->left, screen );
+  }
+  if( parent->right != NULL ){
+    DrawTree( parent->right, screen );
+  }
+}
+
+void DrawBeam( screen* screen, PhotonBeam& b, vec3 colour ){
+  Pixel proj1; Vertex v1; v1.position = b.start;
+  Pixel proj2; Vertex v2; v2.position = b.end;
+  VertexShader( v1, proj1 );
+  VertexShader( v2, proj2 );
+  DrawLine( screen, v1, v2, colour );
+  // PixelShader( screen, proj1.x, proj1.y, vec3(0,1,0) );
+  // PixelShader( screen, proj2.x, proj2.y, vec3(1,0,0) );
+}
+
 
 #endif

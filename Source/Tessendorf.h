@@ -1,9 +1,17 @@
 #ifndef TESSENDORF_H
 #define TESSENDORF_H
 
+#define PI 3.14159265
+
 #include <glm/glm.hpp>
 #include "TestModelH.h"
 #include <complex>
+
+using namespace std;
+using glm::vec3;
+using glm::mat3;
+using glm::vec4;
+using glm::mat4;
 
 typedef struct
 {

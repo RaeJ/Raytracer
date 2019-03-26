@@ -17,7 +17,6 @@ using glm::ivec2;
 #define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 512
 #define FULLSCREEN_MODE false
-#define PI 3.14159265
 #define SSAA 1
 const float focal = SCREEN_WIDTH * SSAA;
 
@@ -40,57 +39,15 @@ struct Vertex
   vec3 reflectance;
 };
 
-struct AABB
-{
-  vec4 max;
-  vec4 min;
-  vec4 mid;
-};
-
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
 void VertexShader( const Vertex& v, Pixel& p );
 void ComputePolygonEdges( screen* screen, const vector<Vertex>& vertices );
 void Interpolate( Pixel a, Pixel b, vector<Pixel>& result );
-void DrawBoundingBox( screen* screen, AABB bound );
 void DrawLine( screen* screen, Vertex& p1, Vertex& p2, vec3 colour );
 void PixelShader( screen* screen, int x, int y, vec3 colour );
 void PositionShader( screen* screen, vec4 position, vec3 colour );
-
-void DrawBoundingBox( screen* screen, AABB bound ){
-  vector<Vertex> vertices(4);
-  vec4 max  = bound.max;
-  vec4 min  = bound.min;
-
-  vertices[0].position  = max;
-  vertices[1].position  = vec4( min.x, max.y, max.z, 1.0f );
-  vertices[2].position  = vec4( min.x, min.y, max.z, 1.0f );
-  vertices[3].position  = vec4( max.x, min.y, max.z, 1.0f );
-
-  ComputePolygonEdges( screen, vertices );
-
-  vector<Vertex> vertices_1(4);
-  vertices_1[0].position  = vec4( max.x, max.y, min.z, 1.0f );
-  vertices_1[1].position  = vec4( min.x, max.y, min.z, 1.0f );
-  vertices_1[2].position  = min;
-  vertices_1[3].position  = vec4( max.x, min.y, min.z, 1.0f );
-
-  ComputePolygonEdges( screen, vertices_1 );
-
-  DrawLine( screen, vertices[0], vertices_1[0], purple );
-  DrawLine( screen, vertices[1], vertices_1[1], purple );
-  DrawLine( screen, vertices[2], vertices_1[2], purple );
-  DrawLine( screen, vertices[3], vertices_1[3], purple );
-
-  Pixel proj1; Vertex min_v; min_v.position = min;
-  Pixel proj2; Vertex max_v; max_v.position = max;
-
-  VertexShader( min_v, proj1 );
-  VertexShader( max_v, proj2 );
-  PixelShader( screen, proj1.x, proj1.y, white );
-  PixelShader( screen, proj2.x, proj2.y, black );
-}
 
 void DrawLine( screen* screen, Vertex& v1, Vertex& v2, vec3 colour ){
   Pixel proj1; VertexShader( v1, proj1 );
