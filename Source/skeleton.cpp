@@ -97,8 +97,8 @@ float m = std::numeric_limits<float>::max();
 
 vec4 camera(0, 0, -3, 1.0);
 vec3 theta( 0.0, 0.0, 0.0 );
-vec4 light_position(0,-0.9,-0.2,1);
-vec3 light_power = 0.005f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.9,-0.4,1);
+vec3 light_power = 0.001f * vec3( 1, 1, 1 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
 std::random_device rd;  //Will be used to obtain a seed for the random number engine
@@ -114,13 +114,14 @@ std::uniform_real_distribution<double> uniform_circle(-1.0, 1.0);
 AABB rroot;
 Node* root;
 
-// float absorption_c = 0.035;
-// float scattering_c = 0.005;
-// float extinction_c = absorption_c + scattering_c;
-
-float absorption_c = 0.01;
-float scattering_c = 0.0005;
+float absorption_c = 0.035;
+float scattering_c = 0.005;
 float extinction_c = absorption_c + scattering_c;
+
+// TODO: fix issue of power depending on Transmittance
+// float absorption_c = 0.0005;
+// float scattering_c = 0.00001;
+// float extinction_c = absorption_c + scattering_c;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -188,7 +189,7 @@ int main( int argc, char* argv[] )
   LoadTestModel( triangles );
 
   cout << "Casting photons" << endl;
-  rroot = CastPhotonBeams( 2000, beams );
+  rroot = CastPhotonBeams( 500, beams );
   BoundPhotonBeams( beams, items );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -579,6 +580,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        Triangle hit_triangle = triangles[hit.index];
        vec4 normal           = hit_triangle.normal;
        vec4 incident         = hit.position + direction;
+       // TODO: Should the below be diffuse instead of specular?
        vec3 refl             = glm::reflect( vec3( incident ), vec3( normal ) );
        vec4 reflected        = vec4( glm::normalize( refl ), 1.0f );
        float transmitted     = Transmittance( diff, extinction_c );
@@ -751,20 +753,12 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                                                intersect.tc_plus,
                                                intersect.tb_plus,
                                                extinction_c );
+
                 float phase_f  = 1 / ( 4 * PI );
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
-                float error_1   = glm::length( intersect.entry_point -
-                                               vec3( limit.position ) );
-                float error_2   = glm::length( intersect.exit_point -
-                                               vec3( limit.position ) );
-                if( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ){
-                  vec3 pigment  = triangles[ limit.index ].colour;
-                  current        += beam.energy * phase_f * rad * pigment;
-                } else {
-                  current        += beam.energy * phase_f * rad * _int;
-                }
+                current        += beam.energy * phase_f * rad * _int;
               }
             }
           }
@@ -799,16 +793,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
-                float error_1   = glm::length( intersect.entry_point -
-                                               vec3( limit.position ) );
-                float error_2   = glm::length( intersect.exit_point -
-                                               vec3( limit.position ) );
-                if( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ){
-                  vec3 pigment  = triangles[ limit.index ].colour;
-                  current        += beam.energy * phase_f * rad * pigment;
-                } else {
-                  current        += beam.energy * phase_f * rad * _int;
-                }
+                current        += beam.energy * phase_f * rad * _int;
               }
             }
           }
