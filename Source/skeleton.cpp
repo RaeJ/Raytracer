@@ -55,6 +55,10 @@ bool HitCylinder( const vec4 start,
                   const vec4 dir,
                   const PhotonSeg& seg,
                   CylIntersection& intersection );
+bool HitCone( const vec4 start,
+              const vec4 dir,
+              const PhotonSeg& seg,
+              CylIntersection& intersection );
 void TransformationMatrix( glm::mat4& m );
 void UserInput();
 vec3 DirectLight( const Intersection& i );
@@ -76,7 +80,7 @@ mat3 findRotationMatrix( vec3 current_dir,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
-  CreateSurface( 10, -0.6, 1.004 );
+  // CreateSurface( 10, -0.6, 1.004 );
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -85,7 +89,7 @@ int main( int argc, char* argv[] )
 
   cout << "Casting photons" << endl;
   mat4 matrix;  TransformationMatrix( matrix );
-  rroot = CastPhotonBeams( 500, beams, matrix, triangles, camera );
+  rroot = CastPhotonBeams( 2, beams, matrix, triangles, camera );
   BoundPhotonBeams( beams, items, triangles );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
@@ -128,16 +132,85 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           Intersection c_i;
 
           direction = glm::normalize( direction );
-          if( ClosestIntersection( start, direction, c_i, matrix, triangles ) ){
-            Triangle close = triangles[c_i.index];
-            colour = close.colour;
-            // BeamRadiance( screen, start, direction, c_i, root, current, beams );
-          }
+        //   if( ClosestIntersection( start, direction, c_i, matrix, triangles ) ){
+        //     Triangle close = triangles[c_i.index];
+        //     // colour = close.colour;
+        //     // BeamRadiance( screen, start, direction, c_i, root, current, beams );
+        //   }
+        // }
+
+
+	          PhotonSeg debugging; CylIntersection intersect;
+	          debugging.start = matrix * vec4( 0.0, -0.2, -0.2, 1.0f );
+	          debugging.end = matrix * vec4( 0.0, 0.2, -0.2, 1.0f );
+	          debugging.radius = 0.05;
+	          PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
+	          if( HitCone( start, direction, debugging, intersect ) ){
+	            // current += vec3( 0, 0, 0.3 );
+	            colour = vec3( 0.3, 0, 0.7 );
+
+	            // mat4 matrix;  TransformationMatrix(matrix);
+	            vec4 light_location = matrix * light_position;
+	            vec4 position       = vec4( intersect.entry_point, 1.0f );
+
+	            vec3 radius = vec3 ( light_location ) - vec3( position );
+	            float A = 4 * PI * glm::dot( radius, radius );
+	            vec4 normal = vec4( intersect.entry_normal, 1.0f );
+	            float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( vec3( normal ) ) );
+	            r_dot_n = max( r_dot_n, 0.0f );
+
+	            vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
+	            vec4 start = position + 0.001f * normal;
+	            Intersection c_i;
+	            ClosestIntersection( start, direction, c_i, matrix, triangles );
+
+	            if( c_i.distance < glm::length( start - light_location ) ){
+	              r_dot_n = 0;
+	            }
+
+	            current += ( light_power * r_dot_n ) / A;
+
+	          } else if( ClosestIntersection( start, direction, c_i, matrix, triangles )  ){
+              Triangle close = triangles[c_i.index];
+              colour = close.colour;
+              current += DirectLight( c_i );
+
+	          // PhotonBeam b;
+	          // b.start = debugging.start;
+	          // b.end = debugging.end;
+	          // DrawBeam( screen, b, vec3(0,1,0) );
+
+	        }
         }
-        PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
+	        // PutPixelSDL( screen, x / SSAA, y / SSAA, current * close.colour / (float) SSAA );
+	        PutPixelSDL( screen, x / SSAA, y / SSAA, ( current / (float) SSAA  + indirect_light ) * colour );
+        // PutPixelSDL( screen, x / SSAA, y / SSAA, colour );
         // PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
+
       }
+      // PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
     }
+    // for( int i=0; i< beams.size(); i++ ){
+    //   DrawBeam( screen, beams[i], vec3(0,1,1) );
+    //   if( beams[i].ada_width ){
+    //     vec4 origin = beams[i].start;
+    //     vec4 w_u    = beams[i].omega_u;
+    //     vec4 w_v    = beams[i].omega_v;
+    //     Intersection hit;
+    //     if( ClosestIntersection( origin, w_u, hit, matrix, triangles ) ){
+    //       PhotonBeam a;
+    //       a.start = origin;
+    //       a.end   = hit.position;
+    //       DrawBeam( screen, a, vec3(1,0,0) );
+    //     }
+    //     if( ClosestIntersection( origin, w_v, hit, matrix, triangles ) ){
+    //       PhotonBeam b;
+    //       b.start = origin;
+    //       b.end   = hit.position;
+    //       DrawBeam( screen, b, vec3(1,0,0) );
+    //     }
+    //   }
+    // }
     SDL_Renderframe(screen);
   }
 }
@@ -332,6 +405,149 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
 
   hit = vec4( position[0], position[1], position[2], 1.0f );
   return true;
+}
+
+bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
+  CylIntersection& intersection ){
+    bool first_inte = false;
+    vec3 first_normal;
+    vec3 second_normal;
+
+    vec3 l_unit_dir = glm::normalize( vec3( dir ) );
+    vec3 difference = vec3( seg.end - seg.start );
+    vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
+                                            glm::length( difference ),
+                                            0.0f ) );
+
+    float S_inv     = 1/glm::length( difference ) ;
+
+    vec3 c_unit_dir = difference * S_inv;
+
+    mat3 R_inv      = findRotationMatrix( c_unit_dir, w_unit_dir );
+
+    vec3 T_inv      = -( R_inv * vec3( seg.start ) * S_inv );
+
+    vec3 origin_prime    = ( R_inv * ( vec3( start ) * S_inv  ) ) + T_inv;
+    vec3 dir_prime       = R_inv * l_unit_dir;
+
+    vec3 first_hit;
+    vec3 second_hit;
+
+    // Quadratic Formula
+    float t0 = -1, t1 = -1;
+
+    // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
+    float a = dir_prime[0] * dir_prime[0]
+            + dir_prime[2] * dir_prime[2]
+            - dir_prime[1] * dir_prime[1];
+
+    float b = 2 * origin_prime[0] * dir_prime[0]
+            + 2 * origin_prime[2] * dir_prime[2]
+            - 2 * origin_prime[1] * dir_prime[1];
+
+    float c = origin_prime[0] * origin_prime[0]
+            + origin_prime[2] * origin_prime[2]
+            - origin_prime[1] * origin_prime[1];
+
+    float b24ac = b*b - 4*a*c;
+
+    if( b24ac < 0 ) return false;
+
+    float sqb24ac = sqrtf(b24ac);
+    t0 = (-b + sqb24ac) / (2 * a);
+    t1 = (-b - sqb24ac) / (2 * a);
+
+    if (t0>t1) {float tmp = t0;t0=t1;t1=tmp;}
+
+    float y0 = origin_prime[1] + t0 * dir_prime[1];
+    float y1 = origin_prime[1] + t1 * dir_prime[1];
+    if ( y0 < 0 )
+    {
+      if( y1 < 0 ) return false;
+      else
+      {
+        // hit the cap
+        float th1 = t0 + (t1-t0) * y0 / (y0-y1);
+        if ( th1 <= 0 ) return false;
+        first_hit = origin_prime + ( dir_prime * th1 );
+        first_inte = true;
+        first_normal = vec3(0, -1, 0);
+
+        if( y1 <= 1 ){
+          second_hit = origin_prime + ( dir_prime * t1 );
+          second_normal = glm::normalize( vec3( second_hit.x, 0, second_hit.z) );
+        } else {
+          float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
+          if ( th2 > 0 ){
+            second_hit = origin_prime + ( dir_prime * th2 );
+            second_normal = vec3(0, -1, 0);
+          }
+        }
+      }
+    }
+    else if ( y0 >= 0 && y0 <= 1 )
+    {
+      // hit the cylinder bit
+      if( t0 <= 0 ) return false;
+      first_hit = origin_prime + ( dir_prime * t0 );
+      first_inte = true;
+      first_normal = glm::normalize( vec3( first_hit.x, 0, first_hit.z) );
+
+      if( y1 >= 0 ){
+        if( y1 <= 1 ){
+          second_hit = origin_prime + ( dir_prime * t1 );
+          second_normal = glm::normalize( vec3( -second_hit.x, 0, -second_hit.z) );
+        } else {
+          float th2 = t1 + (t1-t0) * (y1-1) / (y0-y1);
+          if ( th2 > 0 ){
+            second_hit = origin_prime + ( dir_prime * th2 );
+            second_normal = vec3(0, -1, 0);
+          }
+        }
+      } else {
+        float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+        if (th2>0){
+          second_hit = origin_prime + ( dir_prime * th2 );
+          second_normal = vec3(0, 1, 0);
+        }
+      }
+    }
+    else if ( y0 > 1 )
+    {
+      if ( y1 > 1 ) return false;
+      else {
+        // hit the cap
+        float th = t0 + (t1-t0) * (y0-1) / (y0-y1);
+        if( th <= 0 ) return false;
+        first_hit = origin_prime + ( dir_prime * th );
+        first_inte = true;
+        first_normal = vec3(0, 1, 0);
+        if( y1 >= 0 ){
+          second_hit = origin_prime + ( dir_prime * t1 );
+          second_normal = glm::normalize( vec3( -second_hit.x, 0, -second_hit.z) );
+        } else {
+          float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+          if ( th2 > 0 ){
+            second_hit = origin_prime + ( dir_prime * th2 );
+            second_normal = vec3(0, 1, 0);
+          }
+        }
+      }
+    }
+    if( ( t0 > 0 ) && ( t1 > 0 ) && ( t1 > t0 ) ){
+      intersection.valid       = true;
+      intersection.tb_minus    = first_hit.y / S_inv;
+      intersection.tb_plus     = second_hit.y / S_inv;
+      intersection.tc_minus    = t0 / S_inv;
+      intersection.tc_plus     = t1 / S_inv;
+      intersection.entry_point = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
+      intersection.exit_point  = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
+      intersection.entry_normal= ( glm::inverse( R_inv ) * ( first_normal ) );
+      intersection.exit_normal = ( glm::inverse( R_inv ) * ( second_normal ) );
+    } else {
+      intersection.valid       = false;
+    }
+    return first_inte;
 }
 
 bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,

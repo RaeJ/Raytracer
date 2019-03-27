@@ -1,7 +1,7 @@
 #ifndef CAST_PHOTONS_H
 #define CAST_PHOTONS_H
 
-#define BOUNCES 8
+#define BOUNCES 0
 
 #include <glm/glm.hpp>
 #include "TestModelH.h"
@@ -15,6 +15,9 @@ struct PhotonBeam
 {
   vec4 start;
   vec4 end;
+  vec4 omega_u;
+  vec4 omega_v;
+  bool ada_width;
   float offset;
   float radius;
   vec3 energy;
@@ -81,7 +84,8 @@ vector<PhotonSeg> segments;
 float m = std::numeric_limits<float>::max();
 
 vec4 light_position(0,-0.9,-0.4,1);
-vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+// vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+vec3 light_power = 11.1f * vec3( 1, 1, 1 );
 
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
@@ -127,7 +131,8 @@ void CastBeam( int bounce,
                float offset,
                float radius,
                const vector<Triangle>& triangles,
-               const mat4& matrix
+               const mat4& matrix,
+               PhotonBeam& b
              );
 bool intersectPlane( const vec3& n,
                     const vec3& p0,
@@ -415,9 +420,20 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     vec4 direction = FindDirection( origin, centre, radius );
     direction = glm::normalize( direction );
 
+    PhotonBeam beam;
+    beam.ada_width = true;
     float offset = uniform( generator ) * 0.1;
     float r      = uniform_small( generator );
-    CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, r, triangles, matrix );
+    vec3 w_u     = glm::normalize( vec3( direction.x + r,
+                                         direction.y,
+                                         direction.z ) );
+    vec3 w_v     = glm::normalize( vec3( direction.x,
+                                         direction.y,
+                                         direction.z + r ) );
+    beam.omega_u = vec4( w_u, 1.0f );
+    beam.omega_v = vec4( w_v, 1.0f );
+    CastBeam( 0, energy, origin, direction, min_point, max_point,
+              beams, offset, r, triangles, matrix, beam );
   }
 
   // for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
@@ -458,12 +474,12 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l
 void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
                vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams,
                float offset, float radius, const vector<Triangle>& triangles,
-               const mat4& matrix ){
+               const mat4& matrix, PhotonBeam& beam ){
 
    Intersection hit;
    float diff;
    if( ClosestIntersection( origin, direction, hit, matrix, triangles ) ){
-     PhotonBeam beam;
+     // PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
      beam.offset    = offset;
      beam.radius    = radius;
@@ -495,8 +511,11 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec4 reflected        = vec4( glm::normalize( refl ), 1.0f );
        float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
+       PhotonBeam bounced;
+       bounced.ada_width = false;
        CastBeam( num, new_energy, hit.position, reflected,
-                 min_point, max_point, beams, 0.0f, radius, triangles, matrix );
+                 min_point, max_point, beams, 0.0f, radius,
+                 triangles, matrix, bounced );
      }
    } else {
      vec4 top_left  = vec4( -1, -1, -1, 1 );
@@ -524,7 +543,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      vec3 start     = vec3( origin );
 
      float t;
-     PhotonBeam beam;
+     // PhotonBeam beam;
      beam.offset    = offset;
      beam.radius    = radius;
      beam.energy    = energy;
@@ -579,8 +598,12 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
      float transmitted = Transmittance( t_s, extinction_c );
      vec3 new_energy   = energy * transmitted;
+
+     PhotonBeam scattered;
+     scattered.ada_width = false;
      CastBeam( bounce, new_energy, start, dir_sample,
-               min_point, max_point, beams, 0.0f, radius, triangles, matrix );
+               min_point, max_point, beams, 0.0f,
+               radius, triangles, matrix, scattered );
    }
 }
 
