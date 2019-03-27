@@ -34,7 +34,7 @@ OBJ = $(B_DIR)/$(FILE).o
 
 ########
 #   Objects
-$(B_DIR)/$(FILE).o : $(S_DIR)/$(FILE).cpp $(S_DIR)/SDLauxiliary.h $(S_DIR)/TestModelH.h $(S_DIR)/rasteriser.h $(S_DIR)/CastPhotons.h $(S_DIR)/Tessendorf.h $(S_DIR)/Intersections.h
+$(B_DIR)/$(FILE).o : $(S_DIR)/$(FILE).cpp $(S_DIR)/SDLauxiliary.h $(S_DIR)/TestModelH.h $(S_DIR)/rasteriser.h $(S_DIR)/CastPhotons.h $(S_DIR)/Tessendorf.h $(S_DIR)/Intersections.h $(S_DIR)/Control.h
 	$(CC) $(CC_OPTS) -o $(B_DIR)/$(FILE).o $(S_DIR)/$(FILE).cpp $(SDL_CFLAGS) $(GLM_CFLAGS)
 
 

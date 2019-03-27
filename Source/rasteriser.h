@@ -4,6 +4,7 @@
 #include "SDLauxiliary.h"
 #include <stdint.h>
 #include <random>
+#include "Control.h"
 
 using namespace std;
 using glm::vec3;
@@ -13,11 +14,6 @@ using glm::vec4;
 using glm::mat4;
 using glm::ivec2;
 
-
-#define SCREEN_WIDTH 512
-#define SCREEN_HEIGHT 512
-#define FULLSCREEN_MODE false
-#define SSAA 1
 const float focal = SCREEN_WIDTH * SSAA;
 
 vec3 purple( 0.75f, 0.15f, 0.75f );

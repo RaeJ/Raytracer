@@ -1,13 +1,12 @@
 #ifndef CAST_PHOTONS_H
 #define CAST_PHOTONS_H
 
-#define BOUNCES 0
-
 #include <glm/glm.hpp>
 #include "TestModelH.h"
 #include "rasteriser.h"
 #include "Tessendorf.h"
 #include "Intersections.h"
+#include "Control.h"
 
 // -------------------------------------------------------------------------- //
 // STRUCTS
@@ -57,25 +56,10 @@ struct Node* newNode( AABB data )
 
 vector<PhotonSeg> segments;
 
-vec4 light_position(0,-0.9,-0.4,1);
-// vec3 light_power = 0.001f * vec3( 1, 1, 1 );
-vec3 light_power = 11.1f * vec3( 1, 1, 1 );
-
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_small(0.01, 0.04);
-
-float absorption_c = 0.035;
-float scattering_c = 0.005;
-float extinction_c = absorption_c + scattering_c;
-
-vec4 camera_position;
-
-// TODO: fix issue of power depending on Transmittance
-// float absorption_c = 0.0005;
-// float scattering_c = 0.00001;
-// float extinction_c = absorption_c + scattering_c;
 
 // -------------------------------------------------------------------------- //
 // FUNCTIONS
@@ -83,8 +67,7 @@ vec4 camera_position;
 AABB CastPhotonBeams( int number,
                       vector<PhotonBeam>& beams,
                       const mat4& matrix,
-                      const vector<Triangle>& triangles,
-                      const vec4& camera );
+                      const vector<Triangle>& triangles );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void BuildTree( Node* parent, vector<PhotonSeg>& child );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, const vector<Triangle>& triangles );
@@ -329,9 +312,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 }
 
 AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
-                      const mat4& matrix, const vector<Triangle>& triangles,
-                      const vec4& camera ){
-  camera_position = camera;
+                      const mat4& matrix, const vector<Triangle>& triangles ){
 
   vec4 min_point = vec4( m, m, -m, 1 );
   vec4 max_point = vec4( -m, -m, m, 1 );
@@ -349,7 +330,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     direction = glm::normalize( direction );
 
     PhotonBeam beam;
-    beam.ada_width = true;
+    beam.ada_width = adaptive_radi;
     float offset = uniform( generator ) * 0.1;
     float r      = uniform_small( generator );
     vec3 w_u     = glm::normalize( vec3( direction.x + r,
@@ -450,7 +431,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      vec4 top_right = vec4( 1, -1, -1, 1 );
      vec4 bot_left  = vec4( -1, 1, -1, 1 );
      vec4 bot_right = vec4( 1, 1, -1, 1 );
-     vec4 converge  = matrix * vec4( 0, 0, camera_position.z, 1.0f );
+     vec4 converge  = matrix * vec4( 0, 0, camera.z, 1.0f );
      vec4 top       = vec4( matrix * ( ( top_left + top_right ) / 2.0f ) );
      vec4 right     = vec4( matrix * ( ( top_right + bot_right ) / 2.0f ) );
      vec4 bot       = vec4( matrix * ( ( bot_right + bot_left ) / 2.0f ) );
