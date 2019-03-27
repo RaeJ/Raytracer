@@ -7,6 +7,7 @@
 #include "TestModelH.h"
 #include "rasteriser.h"
 #include "Tessendorf.h"
+#include "Intersections.h"
 
 // -------------------------------------------------------------------------- //
 // STRUCTS
@@ -22,26 +23,6 @@ struct PhotonBeam
   float radius;
   vec3 energy;
   int index_hit;
-};
-
-struct PhotonSeg
-{
-  vec4 start;
-  vec4 end;
-  vec4 mid;
-  vec4 min;
-  vec4 max;
-  vec4 orig_start;
-  float radius;
-  bool ada_width;
-  int id;
-};
-
-struct AABB
-{
-  vec4 max;
-  vec4 min;
-  vec4 mid;
 };
 
 struct Node
@@ -71,19 +52,10 @@ struct Node* newNode( AABB data )
   return(node);
 }
 
-struct Intersection
-{
-  vec4 position;
-  float distance;
-  int index;
-};
-
 // -------------------------------------------------------------------------- //
 // GLOBAL VARIABLES
 
 vector<PhotonSeg> segments;
-
-float m = std::numeric_limits<float>::max();
 
 vec4 light_position(0,-0.9,-0.4,1);
 // vec3 light_power = 0.001f * vec3( 1, 1, 1 );
@@ -108,13 +80,6 @@ vec4 camera_position;
 // -------------------------------------------------------------------------- //
 // FUNCTIONS
 
-bool ClosestIntersection(
-  vec4 start,
-  vec4 dir,
-  Intersection & closestIntersections,
-  const mat4& matrix,
-  const vector<Triangle>& triangles
-);
 AABB CastPhotonBeams( int number,
                       vector<PhotonBeam>& beams,
                       const mat4& matrix,
@@ -153,52 +118,6 @@ void DrawTree( Node* parent, screen* screen );
 
 // -------------------------------------------------------------------------- //
 // IMPLEMENTATION
-
-bool ClosestIntersection( vec4 start, vec4 dir,
-                         Intersection &closestIntersections,
-                         const mat4& matrix,
-                         const vector<Triangle>& triangles ) {
-  bool found = false;
-  closestIntersections.distance = m;
-
-  int vec_size        = triangles.size();
-  int triangle_number = vec_size + waves.size();
-
-  for(int i = 0; i < triangle_number; i++){
-    vec4 v0, v1, v2;
-    if( i < vec_size ){
-      v0 = matrix * triangles[i].v0;
-      v1 = matrix * triangles[i].v1;
-      v2 = matrix * triangles[i].v2;
-    } else {
-      v0 = matrix * waves[i-vec_size].v0;
-      v1 = matrix * waves[i-vec_size].v1;
-      v2 = matrix * waves[i-vec_size].v2;
-    }
-
-    vec3 e1 = vec3(v1.x-v0.x, v1.y-v0.y, v1.z-v0.z);
-    vec3 e2 = vec3(v2.x-v0.x, v2.y-v0.y, v2.z-v0.z);
-    vec3 b = vec3(start.x-v0.x, start.y-v0.y, start.z-v0.z);
-
-    vec3 direction;
-    direction.x = dir.x;
-    direction.y = dir.y;
-    direction.z = dir.z;
-
-    mat3 A(-direction,e1,e2);
-    vec3 x_vec = glm::inverse( A ) * b;
-
-    if(x_vec.x >= 0 && x_vec.y >= 0 && x_vec.z >= 0 && (x_vec.y+x_vec.z) < 1){
-      if(x_vec.x < closestIntersections.distance){
-        found = true;
-        closestIntersections.position = start + dir * x_vec.x;
-        closestIntersections.distance = x_vec.x;
-        closestIntersections.index = i;
-      }
-    }
-  }
-  return found;
-}
 
 void BuildTree( Node* parent, vector<PhotonSeg>& child ){
  if( child.size() <= 2 ) {
