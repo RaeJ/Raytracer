@@ -212,7 +212,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       else
       {
         // hit the cap
-        float th1 = t0 + (t1-t0) * y0 / (y0-y1);
+        float th1 = t0 + (t1-t0) * (y0+min) / (y0-y1);
         if ( th1 <= 0 ) return false;
         first_hit = origin_prime + ( dir_prime * th1 );
         first_inte = true;
@@ -250,7 +250,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
           }
         }
       } else {
-        float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+        float th2 = t0 + (t1-t0) * (y0+min) / (y0-y1);
         if (th2>0){
           second_hit = origin_prime + ( dir_prime * th2 );
           second_normal = vec3(0, 1, 0);
@@ -271,7 +271,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
           second_hit = origin_prime + ( dir_prime * t1 );
           second_normal = glm::normalize( vec3( -second_hit.x, 0, -second_hit.z) );
         } else {
-          float th2 = t0 + (t1-t0) * (y0) / (y0-y1);
+          float th2 = t0 + (t1-t0) * (y0+min) / (y0-y1);
           if ( th2 > 0 ){
             second_hit = origin_prime + ( dir_prime * th2 );
             second_normal = vec3(0, 1, 0);
