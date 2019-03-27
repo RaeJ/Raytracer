@@ -31,7 +31,9 @@ struct PhotonSeg
   vec4 mid;
   vec4 min;
   vec4 max;
+  vec4 orig_start;
   float radius;
+  bool ada_width;
   int id;
 };
 
@@ -343,7 +345,14 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      prior = vec3( beam_seg.end );
 
-     beam_seg.radius = b.radius;
+     if( b.ada_width ){
+       vec4 end_u          = start + ( b.omega_u * j );
+       beam_seg.radius     = glm::length( beam_seg.end - end_u );
+       beam_seg.orig_start = start;
+     } else {
+       beam_seg.radius = b.radius;
+     }
+
      beam_seg.id     = i;
 
      vec3 component  = vec3( 0, 0, 0 );

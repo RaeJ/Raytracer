@@ -141,10 +141,12 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 
 
 	          PhotonSeg debugging; CylIntersection intersect;
+            debugging.orig_start = matrix * vec4( 0.0, -0.4, -0.2, 1.0f );
 	          debugging.start = matrix * vec4( 0.0, -0.2, -0.2, 1.0f );
 	          debugging.end = matrix * vec4( 0.0, 0.2, -0.2, 1.0f );
 	          debugging.radius = 0.05;
 	          PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
+            PositionShader( screen, debugging.end, vec3( 1, 1, 0 ) );
 	          if( HitCone( start, direction, debugging, intersect ) ){
 	            // current += vec3( 0, 0, 0.3 );
 	            colour = vec3( 0.3, 0, 0.7 );
@@ -414,7 +416,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     vec3 second_normal;
 
     vec3 l_unit_dir = glm::normalize( vec3( dir ) );
-    vec3 difference = vec3( seg.end - seg.start );
+    vec3 difference = vec3( seg.end - seg.orig_start );
     vec3 w_unit_dir = glm::normalize( vec3( 0.0f,
                                             glm::length( difference ),
                                             0.0f ) );
@@ -425,10 +427,19 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
 
     mat3 R_inv      = findRotationMatrix( c_unit_dir, w_unit_dir );
 
-    vec3 T_inv      = -( R_inv * vec3( seg.start ) * S_inv );
+    vec3 T_inv      = -( R_inv * vec3( seg.orig_start ) * S_inv );
 
     vec3 origin_prime    = ( R_inv * ( vec3( start ) * S_inv  ) ) + T_inv;
     vec3 dir_prime       = R_inv * l_unit_dir;
+
+    vec3 apex            = ( R_inv * ( vec3( seg.orig_start ) * S_inv  ) ) + T_inv;
+    float height         = glm::length( seg.end - seg.orig_start );
+    float r1             = seg.radius;
+    float r2             = r1 * glm::length( apex - vec3( seg.start ) ) /
+                           glm::length( apex - vec3( seg.orig_start ) );
+    float tan_theta      = r1 / height;
+
+    float min            = -( R_inv * vec3( seg.start ) * S_inv ).y;
 
     vec3 first_hit;
     vec3 second_hit;
@@ -437,17 +448,23 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     float t0 = -1, t1 = -1;
 
     // a=xD2+yD2, b=2xExD+2yEyD, and c=xE2+yE2-1.
-    float a = dir_prime[0] * dir_prime[0]
-            + dir_prime[2] * dir_prime[2]
-            - dir_prime[1] * dir_prime[1];
+    float a = pow( cos( tan_theta ), 2)
+            * ( dir_prime[0] * dir_prime[0]
+            + dir_prime[2] * dir_prime[2] )
+            - pow( sin( tan_theta ), 2)
+            * dir_prime[1] * dir_prime[1];
 
-    float b = 2 * origin_prime[0] * dir_prime[0]
-            + 2 * origin_prime[2] * dir_prime[2]
-            - 2 * origin_prime[1] * dir_prime[1];
+    float b = pow( cos( tan_theta ), 2)
+            * ( 2 * origin_prime[0] * dir_prime[0]
+            + 2 * origin_prime[2] * dir_prime[2] )
+            - pow( sin( tan_theta ), 2)
+            * 2 * origin_prime[1] * dir_prime[1];
 
-    float c = origin_prime[0] * origin_prime[0]
-            + origin_prime[2] * origin_prime[2]
-            - origin_prime[1] * origin_prime[1];
+    float c = pow( cos( tan_theta ), 2)
+            * ( origin_prime[0] * origin_prime[0]
+            + origin_prime[2] * origin_prime[2] )
+            - pow( sin( tan_theta ), 2)
+            * origin_prime[1] * origin_prime[1];
 
     float b24ac = b*b - 4*a*c;
 
@@ -461,9 +478,9 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
 
     float y0 = origin_prime[1] + t0 * dir_prime[1];
     float y1 = origin_prime[1] + t1 * dir_prime[1];
-    if ( y0 < 0 )
+    if ( y0 < min )
     {
-      if( y1 < 0 ) return false;
+      if( y1 < min ) return false;
       else
       {
         // hit the cap
@@ -485,7 +502,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
         }
       }
     }
-    else if ( y0 >= 0 && y0 <= 1 )
+    else if ( y0 >= min && y0 <= 1 )
     {
       // hit the cylinder bit
       if( t0 <= 0 ) return false;
@@ -493,7 +510,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       first_inte = true;
       first_normal = glm::normalize( vec3( first_hit.x, 0, first_hit.z) );
 
-      if( y1 >= 0 ){
+      if( y1 >= min ){
         if( y1 <= 1 ){
           second_hit = origin_prime + ( dir_prime * t1 );
           second_normal = glm::normalize( vec3( -second_hit.x, 0, -second_hit.z) );
