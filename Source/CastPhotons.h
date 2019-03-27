@@ -251,8 +251,10 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        vec4 end_u          = start + ( b.omega_u * j );
        beam_seg.radius     = glm::length( beam_seg.end - end_u );
        beam_seg.orig_start = start;
+       beam_seg.ada_width  = true;
      } else {
        beam_seg.radius = b.radius;
+       beam_seg.ada_width  = false;
      }
 
      beam_seg.id     = i;
@@ -330,7 +332,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     direction = glm::normalize( direction );
 
     PhotonBeam beam;
-    beam.ada_width = adaptive_radi;
+    beam.ada_width = ADAPTIVE;
     float offset = uniform( generator ) * 0.1;
     float r      = uniform_small( generator );
     vec3 w_u     = glm::normalize( vec3( direction.x + r,

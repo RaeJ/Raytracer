@@ -172,23 +172,22 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
             CylIntersection intersect;
-            // if( seg.ada_width ){
-            //   if( HitCone( start, dir, seg, intersect ) ){
-            //     if( intersect.valid ){
-            //       float _int     = Integral_721( intersect.tc_minus,
-            //                                      intersect.tc_plus,
-            //                                      intersect.tb_plus,
-            //                                      extinction_c );
-            //
-            //       float phase_f  = 1 / ( 4 * PI );
-            //       float rad      = scattering_c / ( pow( seg.radius, 2 ) );
-            //
-            //       PhotonBeam beam = beams[ seg.id ];
-            //       current        += beam.energy * phase_f * rad * _int;
-            //     }
-            //   }
-            // } else
-            if( HitCylinder( start, dir, seg, intersect ) ){
+            if( seg.ada_width ){
+              if( HitCone( start, dir, seg, intersect ) ){
+                if( intersect.valid ){
+                  float _int     = Integral_721( intersect.tc_minus,
+                                                 intersect.tc_plus,
+                                                 intersect.tb_plus,
+                                                 extinction_c );
+
+                  float phase_f  = 1 / ( 4 * PI );
+                  float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+
+                  PhotonBeam beam = beams[ seg.id ];
+                  current        += beam.energy * phase_f * rad * _int;
+                }
+              }
+            } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
                 float _int     = Integral_721( intersect.tc_minus,
                                                intersect.tc_plus,
@@ -224,23 +223,22 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
           PhotonSeg seg = segments[i];
           if( seg.id != -1 ){
             CylIntersection intersect;
-            // if( seg.ada_width ){
-            //   if( HitCone( start, dir, seg, intersect ) ){
-            //     if( intersect.valid ){
-            //       float _int     = Integral_721( intersect.tc_minus,
-            //                                      intersect.tc_plus,
-            //                                      intersect.tb_plus,
-            //                                      extinction_c );
-            //
-            //       float phase_f  = 1 / ( 4 * PI );
-            //       float rad      = scattering_c / ( pow( seg.radius, 2 ) );
-            //
-            //       PhotonBeam beam = beams[ seg.id ];
-            //       current        += beam.energy * phase_f * rad * _int;
-            //     }
-            //   }
-            // } else
-            if( HitCylinder( start, dir, seg, intersect ) ){
+            if( seg.ada_width ){
+              if( HitCone( start, dir, seg, intersect ) ){
+                if( intersect.valid ){
+                  float _int     = Integral_721( intersect.tc_minus,
+                                                 intersect.tc_plus,
+                                                 intersect.tb_plus,
+                                                 extinction_c );
+
+                  float phase_f  = 1 / ( 4 * PI );
+                  float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+
+                  PhotonBeam beam = beams[ seg.id ];
+                  current        += beam.energy * phase_f * rad * _int;
+                }
+              }
+            } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
                 float _int     = Integral_721( intersect.tc_minus,
                                                intersect.tc_plus,

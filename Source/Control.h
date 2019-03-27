@@ -8,6 +8,7 @@
 
 #define PHOTON_NUMBER 500
 #define BOUNCES 3
+#define ADAPTIVE false
 
 using namespace std;
 using glm::vec3;
@@ -23,8 +24,6 @@ float scattering_c = 0.005;
 float extinction_c = absorption_c + scattering_c;
 
 vec4 camera(0, 0, -3, 1.0);
-
-bool adaptive_radi = false;
 
 // TODO: fix issue of power depending on Transmittance
 // float absorption_c = 0.0005;
