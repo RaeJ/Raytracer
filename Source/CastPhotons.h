@@ -59,7 +59,7 @@ vector<PhotonSeg> segments;
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
-std::uniform_real_distribution<double> uniform_small(0.01, 0.04);
+std::uniform_real_distribution<double> uniform_small(0.01, 0.1);
 
 // -------------------------------------------------------------------------- //
 // FUNCTIONS
@@ -248,8 +248,11 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      prior = vec3( beam_seg.end );
 
      if( b.ada_width ){
-       vec4 end_u          = start + ( b.omega_u * j );
-       beam_seg.radius     = glm::length( beam_seg.end - end_u );
+       vec3 omega_u        = glm::normalize( vec3( b.omega_u ) );
+       float cos_theta     = glm::dot( dir, omega_u );
+       float hyp_length    = j / cos_theta;
+       vec4 end_u          = start + ( b.omega_u * hyp_length );
+       beam_seg.radius     = glm::length( vec3( beam_seg.end ) - vec3( end_u ) );
        beam_seg.orig_start = start;
        beam_seg.ada_width  = true;
      } else {
@@ -333,14 +336,15 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
 
     PhotonBeam beam;
     beam.ada_width = ADAPTIVE;
-    float offset = uniform( generator ) * 0.1;
+    float offset = uniform_small( generator ) * 0.1;
     float r      = uniform_small( generator );
-    vec3 w_u     = glm::normalize( vec3( direction.x + r,
+    float r_small= uniform_small( generator );
+    vec3 w_u     = glm::normalize( vec3( direction.x + r_small,
                                          direction.y,
                                          direction.z ) );
     vec3 w_v     = glm::normalize( vec3( direction.x,
                                          direction.y,
-                                         direction.z + r ) );
+                                         direction.z - r_small ) );
     beam.omega_u = vec4( w_u, 1.0f );
     beam.omega_v = vec4( w_v, 1.0f );
     CastBeam( 0, energy, origin, direction, min_point, max_point,

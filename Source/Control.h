@@ -7,7 +7,7 @@
 #define SSAA 1
 
 #define PHOTON_NUMBER 500
-#define BOUNCES 3
+#define BOUNCES 8
 #define ADAPTIVE false
 
 using namespace std;
@@ -18,6 +18,7 @@ using glm::mat4;
 
 vec4 light_position(0,-0.9,-0.4,1);
 vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+// vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
 float scattering_c = 0.005;

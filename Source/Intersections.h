@@ -167,7 +167,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     //                        glm::length( apex - vec3( seg.orig_start ) );
     float tan_theta      = r1 / height;
 
-    float min            = ( ( R_inv * vec3( seg.start ) * S_inv ).y + T_inv ).y;
+    float min            = ( ( R_inv * vec3( seg.start ) * S_inv ) + T_inv ).y;
 
     vec3 first_hit;
     vec3 second_hit;
@@ -212,7 +212,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       else
       {
         // hit the cap
-        float th1 = t0 + (t1-t0) * (y0+min) / (y0-y1);
+        float th1 = t0 + (t1-t0) * (y0-min) / (y0-y1);
         if ( th1 <= 0 ) return false;
         first_hit = origin_prime + ( dir_prime * th1 );
         first_inte = true;
@@ -250,7 +250,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
           }
         }
       } else {
-        float th2 = t0 + (t1-t0) * (y0+min) / (y0-y1);
+        float th2 = t0 + (t1-t0) * (y0-min) / (y0-y1);
         if (th2>0){
           second_hit = origin_prime + ( dir_prime * th2 );
           second_normal = vec3(0, 1, 0);
@@ -271,7 +271,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
           second_hit = origin_prime + ( dir_prime * t1 );
           second_normal = glm::normalize( vec3( -second_hit.x, 0, -second_hit.z) );
         } else {
-          float th2 = t0 + (t1-t0) * (y0+min) / (y0-y1);
+          float th2 = t0 + (t1-t0) * (y0-min) / (y0-y1);
           if ( th2 > 0 ){
             second_hit = origin_prime + ( dir_prime * th2 );
             second_normal = vec3(0, 1, 0);
@@ -281,14 +281,16 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     }
     if( ( t0 > 0 ) && ( t1 > 0 ) && ( t1 > t0 ) ){
       intersection.valid       = true;
-      intersection.tb_minus    = first_hit.y / S_inv;
-      intersection.tb_plus     = second_hit.y / S_inv;
-      intersection.tc_minus    = t0 / S_inv;
-      intersection.tc_plus     = t1 / S_inv;
+      intersection.tb_minus    = ( first_hit.y - min ) / S_inv;
+      intersection.tb_plus     = ( second_hit.y - min ) / S_inv;
+      // intersection.tc_minus    = t0 / S_inv;
+      // intersection.tc_plus     = t1 / S_inv;
       intersection.entry_point = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
       intersection.exit_point  = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
       intersection.entry_normal= ( glm::inverse( R_inv ) * ( first_normal ) );
       intersection.exit_normal = ( glm::inverse( R_inv ) * ( second_normal ) );
+      intersection.tc_minus    = glm::length( vec3( start ) - intersection.entry_point );
+      intersection.tc_plus     = glm::length( vec3( start ) - intersection.exit_point );
     } else {
       intersection.valid       = false;
     }

@@ -44,9 +44,69 @@ void BeamRadiance( screen* screen,
                    vec3& current,
                    vector<PhotonBeam>& beams
                  );
-float Integral_721( float tc_m, float tc_p, float tb_p, float extinction );
+float Integral_721( PhotonSeg s,
+                    CylIntersection i,
+                    float extinction,
+                    vec4 dir  );
+float Integral_722_ada( PhotonSeg s,
+                        CylIntersection i,
+                        float extinction,
+                        vec4 dir );
+
+void Testing( screen* screen,
+              vec4 start,
+              vec4 direction,
+              vec3& colour,
+              vec3& current,
+              vector<PhotonBeam> beams,
+              vector<PhotonSeg>& items,
+              const mat4& matrix );
 
 // ------------------------------------------------------------------------- //
+
+void Testing( screen* screen,
+  vec4 start,
+  vec4 direction,
+  vec3& colour,
+  vec3& current,
+  vector<PhotonBeam> beams,
+  vector<PhotonSeg>& items,
+  const mat4& matrix ){
+    Intersection c_i;
+    PhotonSeg debugging; CylIntersection intersect;
+    debugging.orig_start = matrix * vec4( 0.0, -0.4, -0.2, 1.0f );
+    debugging.start = matrix * vec4( -0.3, -0.2, -0.5, 1.0f );
+    debugging.end = matrix * vec4( -0.9, 0.2, -1.1, 1.0f );
+    debugging.radius = 0.05;
+    PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
+    PositionShader( screen, debugging.end, vec3( 1, 1, 0 ) );
+    if( HitCone( start, direction, debugging, intersect ) ){
+      colour = vec3( 0.3, 0, 0.7 );
+      vec4 light_location = matrix * light_position;
+      vec4 position       = vec4( intersect.entry_point, 1.0f );
+      vec3 radius = vec3 ( light_location ) - vec3( position );
+      float A = 4 * PI * glm::dot( radius, radius );
+      vec4 normal = vec4( intersect.entry_normal, 1.0f );
+      float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( vec3( normal ) ) );
+      r_dot_n = max( r_dot_n, 0.0f );
+      vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
+      vec4 start = position + 0.001f * normal;
+      Intersection c_i;
+      ClosestIntersection( start, direction, c_i, matrix, triangles );
+      if( c_i.distance < glm::length( start - light_location ) ){
+        r_dot_n = 0;
+      }
+      current += ( light_power * r_dot_n ) / A;
+    } else if( ClosestIntersection( start, direction, c_i, matrix, triangles )  ){
+      Triangle close = triangles[c_i.index];
+      colour = close.colour;
+      current += DirectLight( c_i );
+    // PhotonBeam b;
+    // b.start = debugging.start;
+    // b.end = debugging.end;
+    // DrawBeam( screen, b, vec3(0,1,0) );
+  }
+}
 
 int main( int argc, char* argv[] )
 {
@@ -67,6 +127,7 @@ int main( int argc, char* argv[] )
   root = newNode( rroot );
   cout << "Building tree" << endl;
   BuildTree( root, items );
+  cout << "Calculating radiance" << endl;
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
@@ -108,10 +169,27 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
             // colour = close.colour;
             BeamRadiance( screen, start, direction, c_i, root, current, beams );
           }
+          // Testing( screen, start, direction, colour, current, beams, items, matrix );
+
         }
       }
+      // PutPixelSDL( screen, x / SSAA, y / SSAA, ( current / (float) SSAA  + indirect_light ) * colour );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
     }
+    // for( int i=0; i<beams.size(); i++ ){
+    //   DrawBeam( screen, beams[i], vec3(1,0,1) );
+    //   if( beams[i].ada_width ){
+    //     float tmp_len = glm::length( beams[i].end - beams[i].start );
+    //     PhotonBeam a; a.start = beams[i].start; a.end = a.start + ( beams[i].omega_u * tmp_len );
+    //     DrawBeam( screen, a, vec3( 0, 0, 1) );
+    //     PhotonBeam b; b.start = beams[i].start; b.end = b.start + ( beams[i].omega_v * tmp_len );
+    //     DrawBeam( screen, b, vec3( 0, 0, 1) );
+    //   }
+    // }
+    // for( int i=0; i<segments.size(); i++ ){
+    //   PositionShader( screen, segments[i].start, vec3(1,0,1));
+    //   PositionShader( screen, segments[i].end, vec3(0,1,1));
+    // }
 
     SDL_Renderframe(screen);
   }
@@ -131,18 +209,45 @@ void Update()
   UserInput();
 }
 
-float Integral_721( float tc_m, float tc_p, float tb_p, float extinction ){
+float Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
+  vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
+  vec3 camera_dir      = glm::normalize( vec3( dir ) );
+  float cos_theta      = glm::dot( beam_dir, -camera_dir );
+
   float integrand = 0;
   float dt_c      = 0.01;
-  float constant  = Transmittance( tb_p, extinction_c );
 
-  for( float tc=tc_m; tc<tc_p; tc = tc + dt_c ){
-    float transmitted = Transmittance( tc, extinction_c );
+  for( float tc=i.tc_minus; tc<i.tc_plus; tc = tc + dt_c ){
+    float tb  = i.tb_minus - ( abs( cos_theta ) * ( tc - i.tc_minus ) );
+    float constant = Transmittance( tb, extinction );
+    float transmitted = Transmittance( tc, extinction ) * constant;
     if( transmitted > 1e-6 ){
       integrand += transmitted;
     }
   }
-  return integrand * constant ;
+  return integrand;
+}
+
+float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
+  vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
+  vec3 camera_dir      = glm::normalize( vec3( dir ) );
+  float cos_theta      = glm::dot( beam_dir, -camera_dir );
+  float integrand      = 0;
+  float dt_b           = 0.001;
+  float length_const   = glm::length( s.orig_start - s.end );
+
+  for( float tb=i.tb_minus; tb<i.tb_plus; tb = tb + dt_b ){
+    float current_r   = ( s.radius / length_const ) * tb;
+    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - i.tb_minus ) );
+    float constant    = Transmittance( tc, extinction );
+    float transmitted = Transmittance( tb, extinction );
+    float tra_radius  = transmitted * constant *
+                        ( scattering_c / pow( current_r, 2 ) );
+    if( tra_radius > 1e-6 ){
+      integrand += tra_radius;
+    }
+  }
+  return integrand;
 }
 
 // TODO: Check if the limit is working correctly
@@ -173,26 +278,27 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
           if( seg.id != -1 ){
             CylIntersection intersect;
             if( seg.ada_width ){
+              // cout << seg.radius << endl;
               if( HitCone( start, dir, seg, intersect ) ){
                 if( intersect.valid ){
-                  float _int     = Integral_721( intersect.tc_minus,
-                                                 intersect.tc_plus,
-                                                 intersect.tb_plus,
-                                                 extinction_c );
+
+                  float _int     = Integral_722_ada( seg,
+                                                     intersect,
+                                                     extinction_c,
+                                                     dir );
 
                   float phase_f  = 1 / ( 4 * PI );
-                  float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                   PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * rad * _int;
+                  current        += beam.energy * phase_f * _int;
                 }
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( intersect.tc_minus,
-                                               intersect.tc_plus,
-                                               intersect.tb_plus,
-                                               extinction_c );
+                float _int     = Integral_721( seg,
+                                               intersect,
+                                               extinction_c,
+                                               dir );
 
                 float phase_f  = 1 / ( 4 * PI );
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
@@ -226,24 +332,23 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
             if( seg.ada_width ){
               if( HitCone( start, dir, seg, intersect ) ){
                 if( intersect.valid ){
-                  float _int     = Integral_721( intersect.tc_minus,
-                                                 intersect.tc_plus,
-                                                 intersect.tb_plus,
-                                                 extinction_c );
+                  float _int     = Integral_722_ada( seg,
+                                                     intersect,
+                                                     extinction_c,
+                                                     dir );
 
                   float phase_f  = 1 / ( 4 * PI );
-                  float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                   PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * rad * _int;
+                  current        += beam.energy * phase_f * _int;
                 }
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( intersect.tc_minus,
-                                               intersect.tc_plus,
-                                               intersect.tb_plus,
-                                               extinction_c );
+                float _int     = Integral_721( seg,
+                                               intersect,
+                                               extinction_c,
+                                               dir );
                 float phase_f  = 1 / ( 4 * PI );
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
