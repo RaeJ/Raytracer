@@ -190,6 +190,8 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     // for( int i=0; i<segments.size(); i++ ){
     //   PositionShader( screen, segments[i].start, vec3(1,0,1));
     //   PositionShader( screen, segments[i].end, vec3(0,1,1));
+    //   AABB box; box.min = segments[i].min; box.max = segments[i].max;
+    //   DrawBoundingBox( screen, box );
     // }
 
     SDL_Renderframe(screen);
