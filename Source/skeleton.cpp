@@ -130,6 +130,7 @@ int main( int argc, char* argv[] )
   cout << "Calculating radiance" << endl;
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+  // Draw( screen, beams, items );
 
   while( NoQuitMessageSDL() )
     {
@@ -209,13 +210,35 @@ void Update()
   UserInput();
 }
 
+float Integral_721_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
+  vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
+  vec3 camera_dir      = glm::normalize( vec3( dir ) );
+  float cos_theta      = glm::dot( beam_dir, -camera_dir );
+  float length_const   = glm::length( s.orig_start - s.end );
+
+  float integrand = 0;
+  float dt_c      = 0.001;
+
+  for( float tc=i.tc_minus; tc<i.tc_plus; tc = tc + dt_c ){
+    float tb  = i.tb_minus - ( abs( cos_theta ) * ( tc - i.tc_minus ) );
+    float current_r   = ( s.radius / length_const ) * tb;
+    float constant = Transmittance( tb, extinction );
+    float transmitted = Transmittance( tc, extinction ) * constant
+                        * ( scattering_c / pow( current_r, 2 ) );
+    if( transmitted > 1e-6 ){
+      integrand += transmitted;
+    }
+  }
+  return integrand;
+}
+
 float Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
   vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
   vec3 camera_dir      = glm::normalize( vec3( dir ) );
   float cos_theta      = glm::dot( beam_dir, -camera_dir );
 
   float integrand = 0;
-  float dt_c      = 0.01;
+  float dt_c      = 0.001;
 
   for( float tc=i.tc_minus; tc<i.tc_plus; tc = tc + dt_c ){
     float tb  = i.tb_minus - ( abs( cos_theta ) * ( tc - i.tc_minus ) );
@@ -235,9 +258,15 @@ float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 d
   float integrand      = 0;
   float dt_b           = 0.001;
   float length_const   = glm::length( s.orig_start - s.end );
+  // cout << "tb min: " << i.tb_minus << endl;
+  // cout << "tb max: " << i.tb_plus << endl;
 
-  for( float tb=i.tb_minus; tb<i.tb_plus; tb = tb + dt_b ){
+  for( float tb=i.tb_minus; tb>i.tb_plus; tb = tb - dt_b ){
+    // NOTE: I am using the wrong radius
     float current_r   = ( s.radius / length_const ) * tb;
+    if( current_r < 1e-6 ){
+      continue;
+    }
     float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - i.tb_minus ) );
     float constant    = Transmittance( tc, extinction );
     float transmitted = Transmittance( tb, extinction );
@@ -247,6 +276,7 @@ float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 d
       integrand += tra_radius;
     }
   }
+  // cout << "Integrand: " << integrand << endl;
   return integrand;
 }
 
@@ -282,7 +312,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               if( HitCone( start, dir, seg, intersect ) ){
                 if( intersect.valid ){
 
-                  float _int     = Integral_722_ada( seg,
+                  float _int     = Integral_721_ada( seg,
                                                      intersect,
                                                      extinction_c,
                                                      dir );
@@ -332,7 +362,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
             if( seg.ada_width ){
               if( HitCone( start, dir, seg, intersect ) ){
                 if( intersect.valid ){
-                  float _int     = Integral_722_ada( seg,
+                  float _int     = Integral_721_ada( seg,
                                                      intersect,
                                                      extinction_c,
                                                      dir );

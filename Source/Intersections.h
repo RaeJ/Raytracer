@@ -283,14 +283,14 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
       intersection.valid       = true;
       intersection.tb_minus    = ( first_hit.y - min ) / S_inv;
       intersection.tb_plus     = ( second_hit.y - min ) / S_inv;
-      // intersection.tc_minus    = t0 / S_inv;
-      // intersection.tc_plus     = t1 / S_inv;
+      intersection.tc_minus    = t0 / S_inv;
+      intersection.tc_plus     = t1 / S_inv;
       intersection.entry_point = ( glm::inverse( R_inv ) * ( first_hit - T_inv ) ) / S_inv;
       intersection.exit_point  = ( glm::inverse( R_inv ) * ( second_hit - T_inv ) ) / S_inv;
       intersection.entry_normal= ( glm::inverse( R_inv ) * ( first_normal ) );
       intersection.exit_normal = ( glm::inverse( R_inv ) * ( second_normal ) );
-      intersection.tc_minus    = glm::length( vec3( start ) - intersection.entry_point );
-      intersection.tc_plus     = glm::length( vec3( start ) - intersection.exit_point );
+      // intersection.tc_minus    = glm::length( vec3( start ) - intersection.entry_point );
+      // intersection.tc_plus     = glm::length( vec3( start ) - intersection.exit_point );
     } else {
       intersection.valid       = false;
     }
