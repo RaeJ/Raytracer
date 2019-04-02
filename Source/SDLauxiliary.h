@@ -16,7 +16,6 @@ typedef struct{
 } screen;
 
 screen* InitializeSDL( int width, int height, bool fullscreen = false );
-bool NoQuitMessageSDL();
 void PutPixelSDL( screen *s, int x, int y, glm::vec3 color );
 void SDL_Renderframe(screen *s);
 void KillSDL(screen* s);
@@ -50,7 +49,7 @@ void SDL_SaveImage(screen *s, const char* filename)
 		<< SDL_GetError() << std::endl;
       exit(1);
     }
-  
+
 }
 
 void KillSDL(screen* s)
@@ -72,19 +71,39 @@ void SDL_Renderframe(screen* s)
 
 screen* InitializeSDL(int width,int height, bool fullscreen)
 {
+  SDL_version compiled;
+  SDL_VERSION(&compiled);
+  if(compiled.major < 2)
+    {
+      std::cout << "Could not initialise SDL: Requires SDL2 headers (current "
+                << (int) compiled.major <<  "." << (int) compiled.minor
+		<< ")" << std::endl;
+      exit(1);
+    }
+
+  SDL_version linked;
+  SDL_GetVersion(&linked);
+  if(linked.major < 2)
+    {
+      std::cout << "Could not initialise SDL: Requires SDL2 runtime (current "
+                << (int) linked.major << "." << (int) linked.minor
+		<< ")" << std::endl;
+      exit(1);
+    }
+
   if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) !=0)
     {
       std::cout << "Could not initialise SDL: "
 		<< SDL_GetError() << std::endl;
       exit(1);
     }
-  
+
   screen *s = new screen;
   s->width = width;
   s->height = height;
   s->buffer = new uint32_t[width*height];
   memset(s->buffer, 0, width*height*sizeof(uint32_t));
-  
+
   uint32_t flags = SDL_WINDOW_OPENGL;
   if(fullscreen)
     {
@@ -122,29 +141,10 @@ screen* InitializeSDL(int width,int height, bool fullscreen)
 	     << SDL_GetError() << std::endl;
       exit(1);
     }
-  
+
   return s;
 }
 
-bool NoQuitMessageSDL()
-{
-  SDL_Event e;
-  while( SDL_PollEvent(&e) )
-    {
-      if( e.type == SDL_QUIT )
-	{
-	  return false;
-	}
-      if( e.type == SDL_KEYDOWN )
-	{
-	  if( e.key.keysym.sym == SDLK_ESCAPE)
-	    {
-	      return false;
-	    }
-	}
-    }
-  return true;
-}
 
 void PutPixelSDL(screen* s, int x, int y, glm::vec3 colour)
 {

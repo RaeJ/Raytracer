@@ -9,6 +9,7 @@ struct Intersection
   vec4 position;
   float distance;
   int index;
+  bool water;
 };
 
 struct CylIntersection
@@ -454,11 +455,14 @@ bool ClosestIntersection( vec4 start, vec4 dir,
       v0 = matrix * triangles[i].v0;
       v1 = matrix * triangles[i].v1;
       v2 = matrix * triangles[i].v2;
-    } else {
-      v0 = matrix * waves[i-vec_size].v0;
-      v1 = matrix * waves[i-vec_size].v1;
-      v2 = matrix * waves[i-vec_size].v2;
+      closestIntersections.water = false;
     }
+    // else {
+    //   v0 = matrix * waves[i-vec_size].v0;
+    //   v1 = matrix * waves[i-vec_size].v1;
+    //   v2 = matrix * waves[i-vec_size].v2;
+    //   closestIntersections.water = true;
+    // }
 
     vec3 e1 = vec3(v1.x-v0.x, v1.y-v0.y, v1.z-v0.z);
     vec3 e2 = vec3(v2.x-v0.x, v2.y-v0.y, v2.z-v0.z);

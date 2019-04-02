@@ -56,8 +56,8 @@ void CreateSurface( int triangle_number, float height, double time  )
   std::vector<vec4> grid_points( total_points );
   for( int i=0; i<total_points; i++ ){
     grid_points[i].x = ( i % width_points ) * triangle_size;
-    grid_points[i].z = floor( i / width_points ) * triangle_size;
-    grid_points[i].y = height;
+    grid_points[i].z = height;
+    grid_points[i].y = floor( i / width_points ) * triangle_size;
 
     grid_points[i]    -= SHIFT;
     grid_points[i].x  *= -1;
@@ -83,7 +83,7 @@ void UpdateHeight( double time )
   float multiplier = ( 1 / sqrt( 2 ) ) ;
 
   for( int i = 0; i<GRID.geometric_points.size(); i++ ){
-    glm::vec2 x_0( GRID.geometric_points[i].x, GRID.geometric_points[i].z );
+    glm::vec2 x_0( GRID.geometric_points[i].x, GRID.geometric_points[i].y );
     std::complex<float> result = 0;
 
     for( float n = 0; n < HALF_W; n = n + step ){
@@ -124,9 +124,9 @@ void UpdateHeight( double time )
         result +=  partial * eikx0;
       }
     }
-    GRID.geometric_points[i].y = abs( result );
-    GRID.geometric_points[i].y += GRID.height;
-    GRID.geometric_points[i].y *= -1;
+    GRID.geometric_points[i].z = abs( result );
+    GRID.geometric_points[i].z += GRID.height;
+    // GRID.geometric_points[i].y *= -1;
   }
   AddTessendorfWaves();
 }

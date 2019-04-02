@@ -24,17 +24,20 @@ std::random_device rd;  //Will be used to obtain a seed for the random number en
 std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
 std::normal_distribution<> dis(0.0, 4 );
 
-AABB rroot;
+AABB root_aabb;
 Node* root;
+mat4 root_matrix;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
-void Update();
-void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items );
+bool Update();
+void Draw( screen* screen,
+           vector<PhotonBeam> beams,
+           vector<PhotonSeg>& items );
 
 void TransformationMatrix( glm::mat4& m );
-void UserInput();
+bool UserInput();
 vec3 DirectLight( const Intersection& i );
 void BeamRadiance( screen* screen,
                    vec4 start,
@@ -61,6 +64,7 @@ void Testing( screen* screen,
               vector<PhotonBeam> beams,
               vector<PhotonSeg>& items,
               const mat4& matrix );
+void RecurseTree( Node* parent, const mat4& transform );
 
 // ------------------------------------------------------------------------- //
 
@@ -99,6 +103,10 @@ void Testing( screen* screen,
       current += ( light_power * r_dot_n ) / A;
     } else if( ClosestIntersection( start, direction, c_i, matrix, triangles )  ){
       Triangle close = triangles[c_i.index];
+      if( c_i.water ){
+        close = waves[ c_i.index - triangles.size() ];
+      }
+
       colour = close.colour;
       current += DirectLight( c_i );
     // PhotonBeam b;
@@ -111,7 +119,7 @@ void Testing( screen* screen,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
-  // CreateSurface( 10, -0.6, 1.004 );
+  CreateSurface( 10, 0.0, 1.004 );
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -120,11 +128,12 @@ int main( int argc, char* argv[] )
 
   cout << "Casting photons" << endl;
   mat4 matrix;  TransformationMatrix( matrix );
-  rroot = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+  root_matrix = matrix;
+  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
   BoundPhotonBeams( beams, items, triangles );
   cout << "Beams size: " << beams.size() << "\n";
   cout << "Segment size: " << items.size() << "\n";
-  root = newNode( rroot );
+  root = newNode( root_aabb );
   cout << "Building tree" << endl;
   BuildTree( root, items );
   cout << "Calculating radiance" << endl;
@@ -132,9 +141,8 @@ int main( int argc, char* argv[] )
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
   // Draw( screen, beams, items );
 
-  while( NoQuitMessageSDL() )
+  while( Update() )
     {
-      Update();
       Draw( screen, beams, items );
       SDL_Renderframe(screen);
     }
@@ -145,16 +153,62 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
+void RecurseTree( Node* parent, const mat4& transform ){
+  Node* left     = parent->left;
+  Node* right    = parent->right;
+  if( left != NULL){
+    left->aabb.min = transform * left->aabb.min;
+    left->aabb.max = transform * left->aabb.max;
+    left->aabb.mid = transform * left->aabb.mid;
+    for( int i = 0; i<2; i++ ){
+      if( left->segments[i].id != -1 ){
+        left->segments[i].start = transform * left->segments[i].start;
+        left->segments[i].end   = transform * left->segments[i].end;
+        left->segments[i].mid   = transform * left->segments[i].mid;
+        left->segments[i].max   = transform * left->segments[i].max;
+        left->segments[i].orig_start = transform * left->segments[i].orig_start;
+      }
+    }
+    RecurseTree( left, transform );
+  }
+  if( right != NULL){
+    right->aabb.min = transform * right->aabb.min;
+    right->aabb.max = transform * right->aabb.max;
+    right->aabb.mid = transform * right->aabb.mid;
+    for( int i = 0; i<2; i++ ){
+      if( right->segments[i].id != -1 ){
+        right->segments[i].start = transform * right->segments[i].start;
+        right->segments[i].end   = transform * right->segments[i].end;
+        right->segments[i].mid   = transform * right->segments[i].mid;
+        right->segments[i].max   = transform * right->segments[i].max;
+        right->segments[i].orig_start = transform * right->segments[i].orig_start;
+      }
+    }
+    RecurseTree( right, transform );
+  }
+}
+
 void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
-  mat4 matrix;  TransformationMatrix(matrix);
+  mat4 inverse_matrix = glm::inverse( root_matrix );
+  mat4 matrix;
+
+  TransformationMatrix( matrix );
+
+  // if( updated ){
+  //   mat4 full_transform = matrix * inverse_matrix;
+  //   full_transform[0][3] = 0; full_transform[2][3] = 0;
+  //   full_transform[1][3] = 0; full_transform[3][3] = 1;
+  //   RecurseTree( root, full_transform );
+  //   root_matrix = matrix;
+  // }
   /* Clear buffer */
   // memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
   // Drawing stage
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
       vec3 current = vec3( 0, 0, 0 );
-      vec3 colour  = vec3( 0, 0, 0 );
+      vec3 colour = vec3( 0, 0, 0 );
       for( int i = 0; i<SSAA; i++ ){
         for( int j = 0; j<SSAA; j++ ){
           float x_dir = ( x + i ) - ( (SCREEN_WIDTH * SSAA) / (float) 2 );
@@ -167,39 +221,28 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
           direction = glm::normalize( direction );
           if( ClosestIntersection( start, direction, c_i, matrix, triangles ) ){
             Triangle close = triangles[c_i.index];
-            // colour = close.colour;
+            colour = close.colour;
+
             BeamRadiance( screen, start, direction, c_i, root, current, beams );
           }
           // Testing( screen, start, direction, colour, current, beams, items, matrix );
-
         }
       }
-      // PutPixelSDL( screen, x / SSAA, y / SSAA, ( current / (float) SSAA  + indirect_light ) * colour );
+      // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
     }
-    // for( int i=0; i<beams.size(); i++ ){
-    //   DrawBeam( screen, beams[i], vec3(1,0,1) );
-    //   if( beams[i].ada_width ){
-    //     float tmp_len = glm::length( beams[i].end - beams[i].start );
-    //     PhotonBeam a; a.start = beams[i].start; a.end = a.start + ( beams[i].omega_u * tmp_len );
-    //     DrawBeam( screen, a, vec3( 0, 0, 1) );
-    //     PhotonBeam b; b.start = beams[i].start; b.end = b.start + ( beams[i].omega_v * tmp_len );
-    //     DrawBeam( screen, b, vec3( 0, 0, 1) );
-    //   }
-    // }
+
     // for( int i=0; i<segments.size(); i++ ){
     //   PositionShader( screen, segments[i].start, vec3(1,0,1));
     //   PositionShader( screen, segments[i].end, vec3(0,1,1));
-    //   AABB box; box.min = segments[i].min; box.max = segments[i].max;
-    //   DrawBoundingBox( screen, box );
+    //   // AABB box; box.min = segments[i].min; box.max = segments[i].max;
+    //   // DrawBoundingBox( screen, box );
     // }
-
     SDL_Renderframe(screen);
   }
 }
 
-/*Place updates of parameters here*/
-void Update()
+bool Update()
 {
   static int t = SDL_GetTicks();
   /* Compute frame time */
@@ -209,7 +252,7 @@ void Update()
   /*Good idea to remove this*/
   // std::cout << "Render time: " << dt << " ms." << std::endl;
   /* Update variables*/
-  UserInput();
+  return( UserInput() );
 }
 
 float Integral_721_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
@@ -336,7 +379,19 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
-                current        += beam.energy * phase_f * rad * _int;
+                // current        += beam.energy * phase_f * rad * _int;
+
+                float error_1   = glm::length( intersect.entry_point -
+                                               vec3( limit.position ) );
+                float error_2   = glm::length( intersect.exit_point -
+                                               vec3( limit.position ) );
+                if( ( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ) &&
+                  beam.absorbed ){
+                  float transmitted = Transmittance( max_distance, extinction_c );
+                  current        += transmitted * beam.energy;
+                } else {
+                  current        += beam.energy * phase_f * rad * _int;
+                }
               }
             }
           }
@@ -385,7 +440,20 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                 float rad      = scattering_c / ( pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
-                current        += beam.energy * phase_f * rad * _int;
+                // current        += beam.energy * phase_f * rad * _int;
+
+                float error_1   = glm::length( intersect.entry_point -
+                                               vec3( limit.position ) );
+                float error_2   = glm::length( intersect.exit_point -
+                                               vec3( limit.position ) );
+
+                if( ( ( error_1 || error_2 ) <= ( seg.radius + 0.01 ) ) &&
+                  beam.absorbed ){
+                  float transmitted = Transmittance( max_distance, extinction_c );
+                  current        += transmitted * beam.energy;
+                } else {
+                  current        += beam.energy * phase_f * rad * _int;
+                }
               }
             }
           }
@@ -406,8 +474,9 @@ vec3 DirectLight( const Intersection& i ){
   vec3 radius = vec3 ( light_location ) - vec3( position );
   float A = 4 * PI * glm::dot( radius, radius );
   vec4 normal = vec4( triangles[i.index].normal );
+  if( i.water ) normal = waves[i.index-triangles.size()].normal;
   float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( vec3( normal ) ) );
-  r_dot_n = max( r_dot_n, 0.0f );
+  r_dot_n = fmax( r_dot_n, 0.0f );
 
   vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
   vec4 start = position + 0.001f * normal;
@@ -443,62 +512,80 @@ void TransformationMatrix(glm::mat4& M){
     M[3][3] = 1;
   }
 
-  void UserInput(){
-    const uint8_t* keystate = SDL_GetKeyboardState( 0 );
+bool UserInput(){
 
-    if( keystate == NULL ) {
-      printf("keystate = NULL!\n");
+  SDL_Event e;
+  while( SDL_PollEvent( &e ) )
+  {
+    if ( e.type == SDL_QUIT )
+    {
+      return false;
     }
-    // Rotation
-    if( keystate[SDL_SCANCODE_UP] ) {
-      theta.x -= PI/180;
-    }
-    if( keystate[SDL_SCANCODE_DOWN] ) {
-      theta.x += PI/180;
-    }
-    if( keystate[SDL_SCANCODE_LEFT] ) {
-      theta.y += PI/180;
-    }
-    if( keystate[SDL_SCANCODE_RIGHT] ) {
-      theta.y -= PI/180;
-    }
-    // Move forward/back/left/right
-    if( keystate[SDL_SCANCODE_W] ) {
-      camera.z += 0.1;
-    }
-    if( keystate[SDL_SCANCODE_S] ) {
-      camera.z -= 0.1;
-    }
-    if( keystate[SDL_SCANCODE_A] ) {
-      camera.x -= 0.1;
-    }
-    if( keystate[SDL_SCANCODE_D] ) {
-      camera.x += 0.1;
-    }
-    // Move the light
-    if( keystate[SDL_SCANCODE_I] ) {
-      light_position.z += 0.1;
-    }
-    if( keystate[SDL_SCANCODE_K] ) {
-      light_position.z -= 0.1;
-    }
-    if( keystate[SDL_SCANCODE_J] ) {
-      light_position.x -= 0.1;
-    }
-    if( keystate[SDL_SCANCODE_L] ) {
-      light_position.x += 0.1;
-    }
-    if( keystate[SDL_SCANCODE_U] ) {
-      light_position.y += 0.1;
-    }
-    if( keystate[SDL_SCANCODE_O] ) {
-      light_position.y -= 0.1;
-    }
+    else if ( e.type == SDL_KEYDOWN )
+    {
+      int key_code = e.key.keysym.sym;
+      switch(key_code)
+      {
+        // Rotation
+        case SDLK_UP:
+        theta.x += PI/180;
+    		break;
+    	  case SDLK_DOWN:
+        theta.x -= PI/180;
+    		break;
+    	  case SDLK_LEFT:
+    		theta.y += PI/180;
+    		break;
+    	  case SDLK_RIGHT:
+    		theta.y -= PI/180;
+    		break;
 
-    // Reset state
-    if( keystate[SDL_SCANCODE_R] ) {
-      camera = vec4( 0, 0, -3.00, 1 );
-      theta = vec3( 0.0, 0.0, 0.0 );
-      light_position = vec4(0,-0.5,-0.7,1);;
+        // Move forward/back/left/right
+        case SDLK_w:
+        camera.z += 0.1;
+        break;
+        case SDLK_s:
+        camera.z -= 0.1;
+        break;
+        case SDLK_a:
+        camera.x -= 0.1;
+        break;
+        case SDLK_d:
+        camera.x += 0.1;
+        break;
+
+        // Move the light
+        case SDLK_l:
+        light_position.x += 0.1;
+        break;
+        case SDLK_j:
+        light_position.x -= 0.1;
+        break;
+        case SDLK_o:
+        light_position.y -= 0.1;
+        break;
+        case SDLK_u:
+        light_position.y += 0.1;
+        break;
+        case SDLK_k:
+        light_position.z -= 0.1;
+        break;
+        case SDLK_i:
+        light_position.z += 0.1;
+        break;
+
+        // Reset state
+        case SDLK_r:
+        camera = vec4( 0, 0, -3.00, 1 );
+        theta = vec3( 0.0, 0.0, 0.0 );
+        light_position = vec4(0,-0.5,-0.7,1);
+        break;
+
+    	  case SDLK_ESCAPE:
+    		/* Move camera quit */
+    		return false;
+      }
     }
   }
+  return true;
+}

@@ -22,6 +22,7 @@ struct PhotonBeam
   float radius;
   vec3 energy;
   int index_hit;
+  bool absorbed;
 };
 
 struct Node
@@ -59,7 +60,8 @@ vector<PhotonSeg> segments;
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
-std::uniform_real_distribution<double> uniform_small(0.01, 0.1);
+// std::uniform_real_distribution<double> uniform_small(0.01, 0.1);
+std::uniform_real_distribution<double> uniform_small(0.01, 0.04);
 
 // -------------------------------------------------------------------------- //
 // FUNCTIONS
@@ -173,7 +175,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
    AABB left_child;
    left_child.min = vec4( min.x, min.y, min.z, 1.0f );
    left_child.max = vec4( max.x, max.y, max.z, 1.0f );
-   left_child.mid = ( min + max ) / 2.0f;
+   left_child.mid = ( left_child.min + left_child.max ) / 2.0f;
    Node *left_node = newNode( left_child );
    parent->left = left_node;
    BuildTree( parent->left, l );
@@ -195,7 +197,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
    AABB right_child;
    right_child.min = vec4( min.x, min.y, min.z, 1.0f );
    right_child.max = vec4( max.x, max.y, max.z, 1.0f );
-   right_child.mid = ( min + max ) / 2.0f;
+   right_child.mid = ( right_child.min + right_child.max ) / 2.0f;
    Node *right_node = newNode( right_child );
    parent->right = right_node;
    BuildTree( parent->right, r );
@@ -226,7 +228,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float cos_x  = glm::dot( abs( dir ), x_dir );
    float cos_y  = glm::dot( abs( dir ), y_dir );
 
-   float step   = 0.2;
+   float step   = 0.02;
 
    if( b.ada_width ){
      step = length;
@@ -258,6 +260,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        vec4 end_u          = start + ( b.omega_u * hyp_length );
        beam_seg.radius     = glm::length( vec3( beam_seg.end ) - vec3( end_u ) );
        beam_seg.orig_start = start;
+       beam_seg.orig_start.w = 1.0f;
        beam_seg.ada_width  = true;
      } else {
        beam_seg.radius = b.radius;
@@ -334,11 +337,12 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
 
   vec3 energy    = light_power;
 
+    PhotonBeam beam;
+
+
   for( int i=0; i<number; i++ ){
     vec4 direction = FindDirection( origin, centre, radius );
     direction = glm::normalize( direction );
-
-    PhotonBeam beam;
     beam.ada_width = ADAPTIVE;
     float offset = uniform_small( generator ) * 0.1;
     float r      = uniform_small( generator );
@@ -351,20 +355,22 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
                                          direction.z - r_small ) );
     beam.omega_u = vec4( w_u, 1.0f );
     beam.omega_v = vec4( w_v, 1.0f );
+
     CastBeam( 0, energy, origin, direction, min_point, max_point,
               beams, offset, r, triangles, matrix, beam );
   }
 
   // for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
   //   {
-  //       for (double theta = 0.; theta < PI; theta += PI/20.) // Elevation [0, PI]
+  //       for (double theta = 0.; theta < PI; theta += PI/50.) // Elevation [0, PI]
   //       {
   //           float x        = cos(phi) * sin(theta);
   //           float y        = sin(phi) * sin(theta);
   //           float z        =            cos(theta);
   //           vec4 direction = glm::normalize( vec4( x, y, z, 1.0f ) );
   //           float offset   = 0.0f;
-  //           CastBeam( 0, energy, origin, direction, min_point, max_point, beams, offset, 0.02 );
+  //           CastBeam( 0, energy, origin, direction, min_point, max_point, beams,
+  //                     offset, 0.02, triangles, matrix, beam );
   //       }
   //   }
 
@@ -408,6 +414,13 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.start     = origin + beam.offset;
      beam.end       = hit.position;
 
+     float absorbed = uniform( generator );
+     if( absorbed <= 0.08 ){
+       beam.absorbed= true;
+     } else{
+       beam.absorbed= false;
+     }
+
      beams.push_back( beam );
 
      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
@@ -419,7 +432,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
      diff        = glm::length( vec3( hit.position - origin ) );
 
-     if( bounce < BOUNCES ){
+     if( ( bounce < BOUNCES ) && ( !beam.absorbed ) ){
        // float rand            =  dis( gen ) * 0.01;
        int num               = bounce + 1;
        Triangle hit_triangle = triangles[hit.index];
@@ -463,6 +476,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
      float t;
      // PhotonBeam beam;
+     beam.absorbed  = false;
      beam.offset    = offset;
      beam.radius    = radius;
      beam.energy    = energy;
