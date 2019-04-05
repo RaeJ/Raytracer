@@ -332,6 +332,7 @@ float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  )
   vec3 b_norm      = -camera_dir;
   vec3 a_norm      = beam_dir;
   vec3 v           = glm::cross( a_norm, b_norm );
+  float sin_theta  = glm::length( v );
   vec3 v_norm      = glm::normalize( v );
   float distance   = abs( glm::dot( x_1 - i.entry_point, v ) / glm::length( v ) );
   vec3 x_3         = ( distance * v_norm ) + i.entry_point;
@@ -340,7 +341,12 @@ float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  )
                      pow( glm::length( v ), 2 );
   float s2         = glm::determinant( mat3( c, a_norm, v_norm ) ) /
                     pow( glm::length( v ), 2 );
-  vec3 intersect_1 = ( x_3 + x_1 + ( a_norm * s1 ) + ( b_norm * s2 ) ) / 2;
+  vec3 intersect_1 = ( x_3 + x_1 + ( a_norm * s1 ) + ( b_norm * s2 ) ) / 2.0f;
+  vec3 intersect_2 = intersect_1 - ( distance * v_norm );
+  float t_bc       = glm::length( ( intersect_1 - x_1 ) / a_norm );
+  float t_cb       = glm::length( ( intersect_2 - i.entry_point ) / b_norm );
+  float transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
+  return ( transmitted / sin_theta );
 }
 
 
@@ -389,7 +395,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_73( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
@@ -451,7 +457,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_73( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
