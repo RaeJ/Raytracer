@@ -400,7 +400,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_73( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
@@ -462,7 +462,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_73( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );

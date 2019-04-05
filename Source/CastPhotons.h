@@ -256,7 +256,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      beam_seg.orig_start = start;
      beam_seg.orig_start.w = 1.0f;
-     
+
      if( b.ada_width ){
        vec3 omega_u        = glm::normalize( vec3( b.omega_u ) );
        float cos_theta     = glm::dot( dir, omega_u );
@@ -417,7 +417,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.end       = hit.position;
 
      float absorbed = uniform( generator );
-     if( absorbed <= 0.08 ){
+     if( absorbed <= ABSORBED ){
        beam.absorbed= true;
      } else{
        beam.absorbed= false;
