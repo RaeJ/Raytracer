@@ -254,14 +254,15 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      prior = vec3( beam_seg.end );
 
+     beam_seg.orig_start = start;
+     beam_seg.orig_start.w = 1.0f;
+     
      if( b.ada_width ){
        vec3 omega_u        = glm::normalize( vec3( b.omega_u ) );
        float cos_theta     = glm::dot( dir, omega_u );
        float hyp_length    = j / cos_theta;
        vec4 end_u          = start + ( b.omega_u * hyp_length );
        beam_seg.radius     = glm::length( vec3( beam_seg.end ) - vec3( end_u ) );
-       beam_seg.orig_start = start;
-       beam_seg.orig_start.w = 1.0f;
        beam_seg.ada_width  = true;
      } else {
        beam_seg.radius = b.radius;

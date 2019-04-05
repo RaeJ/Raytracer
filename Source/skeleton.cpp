@@ -326,29 +326,36 @@ float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 d
 }
 
 float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  ){
+  float transmitted= 0;
   vec3 x_1         = vec3( s.start );   vec3 x_3 = i.exit_point;
   vec3 x_2         = vec3( s.end );     vec3 x_4 = i.entry_point;
   vec3 a           = glm::normalize( x_2 - x_1 );
-  vec3 b           = glm::normalize( x_4 - x_3 );
+  vec3 b           = glm::normalize( vec3( dir ) );
   vec3 c           = x_1 - x_3;
   float a_dot_b    = glm::dot( a, b );
   float b_dot_c    = glm::dot( b, c );
   float a_dot_c    = glm::dot( a, c );
   float a_dot_a    = glm::dot( a, a );
   float b_dot_b    = glm::dot( b, b );
-  float t_bc       = ( ( -a_dot_b * b_dot_c ) + ( a_dot_c * b_dot_b ) ) /
-                      ( ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b ) );
-  float t_cb       = ( ( a_dot_b * a_dot_c ) - ( b_dot_c * a_dot_a ) ) /
-                      ( ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b ) );
-  // if( t_cb < 0 ){
-  //   cout << "t_cb is less than zero >>>>>>>>" << endl;
-  // }
-  // if( t_bc < 0 ){
-  //   cout << "t_bc is less than zero --------" << endl;
-  // }
+  float denominator= ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b );
+
+  if( a_dot_a != 0 && b_dot_b !=0 && denominator != 0 ){
+    float d          = ( ( -a_dot_b * b_dot_c ) + ( a_dot_c * b_dot_b ) ) / denominator;
+    float e          = ( ( a_dot_b * a_dot_c ) - ( b_dot_c * a_dot_a ) ) / denominator;
+    vec3 intersect_d = x_1 + ( a * d );
+    vec3 intersect_e = x_3 + ( e * d );
+
+    float t_bc       = glm::length( intersect_d - vec3( s.orig_start ) );
+
+    float t_cb       = glm::length( intersect_e );
+
+    transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
+  }
+
   float sin_theta  = glm::length( glm::cross( a, b ) );
 
-  float transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
+  // cout << ( transmitted / sin_theta ) << endl;
+
   return ( transmitted / sin_theta );
 }
 
@@ -398,7 +405,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_73( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
@@ -460,7 +467,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_73( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
