@@ -20,10 +20,6 @@ vector<Triangle> triangles;
 vec3 theta( 0.0, 0.0, 0.0 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
 
-std::random_device rd;  //Will be used to obtain a seed for the random number engine
-std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-std::normal_distribution<> dis(0.0, 4 );
-
 AABB root_aabb;
 Node* root;
 mat4 root_matrix;
@@ -55,6 +51,10 @@ float Integral_722_ada( PhotonSeg s,
                         CylIntersection i,
                         float extinction,
                         vec4 dir );
+float Integral_73( PhotonSeg s,
+                   CylIntersection i,
+                   float extinction,
+                   vec4 dir  );
 
 void Testing( screen* screen,
               vec4 start,
@@ -324,6 +324,25 @@ float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 d
   // cout << "Integrand: " << integrand << endl;
   return integrand;
 }
+
+float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  ){
+  vec3 x_1         = vec3( s.start );
+  vec3 beam_dir    = glm::normalize( vec3( s.end ) - x_1 );
+  vec3 camera_dir  = glm::normalize( vec3( dir ) );
+  vec3 b_norm      = -camera_dir;
+  vec3 a_norm      = beam_dir;
+  vec3 v           = glm::cross( a_norm, b_norm );
+  vec3 v_norm      = glm::normalize( v );
+  float distance   = abs( glm::dot( x_1 - i.entry_point, v ) / glm::length( v ) );
+  vec3 x_3         = ( distance * v_norm ) + i.entry_point;
+  vec3 c           =  x_3 - x_1;
+  float s1         = glm::determinant( mat3( c, b_norm, v_norm ) ) /
+                     pow( glm::length( v ), 2 );
+  float s2         = glm::determinant( mat3( c, a_norm, v_norm ) ) /
+                    pow( glm::length( v ), 2 );
+  vec3 intersect_1 = ( x_3 + x_1 + ( a_norm * s1 ) + ( b_norm * s2 ) ) / 2;
+}
+
 
 // TODO: Check if the limit is working correctly
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& limit, Node* parent,
