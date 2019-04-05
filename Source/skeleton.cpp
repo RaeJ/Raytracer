@@ -47,10 +47,10 @@ float Integral_721( PhotonSeg s,
                     CylIntersection i,
                     float extinction,
                     vec4 dir  );
-float Integral_722_ada( PhotonSeg s,
-                        CylIntersection i,
-                        float extinction,
-                        vec4 dir );
+float Integral_722( PhotonSeg s,
+                    CylIntersection i,
+                    float extinction,
+                    vec4 dir );
 float Integral_73( PhotonSeg s,
                    CylIntersection i,
                    float extinction,
@@ -296,32 +296,22 @@ float Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir )
   return integrand;
 }
 
-float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
+float Integral_722( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
   vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
   vec3 camera_dir      = glm::normalize( vec3( dir ) );
   float cos_theta      = glm::dot( beam_dir, -camera_dir );
+
   float integrand      = 0;
   float dt_b           = 0.001;
-  float length_const   = glm::length( s.orig_start - s.end );
-  // cout << "tb min: " << i.tb_minus << endl;
-  // cout << "tb max: " << i.tb_plus << endl;
 
   for( float tb=i.tb_minus; tb>i.tb_plus; tb = tb - dt_b ){
-    // NOTE: I am using the wrong radius
-    float current_r   = ( s.radius / length_const ) * tb;
-    if( current_r < 1e-6 ){
-      continue;
-    }
     float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - i.tb_minus ) );
     float constant    = Transmittance( tc, extinction );
-    float transmitted = Transmittance( tb, extinction );
-    float tra_radius  = transmitted * constant *
-                        ( scattering_c / pow( current_r, 2 ) );
-    if( tra_radius > 1e-6 ){
-      integrand += tra_radius;
+    float transmitted = Transmittance( tb, extinction ) * constant;
+    if( transmitted > 1e-6 ){
+      integrand += transmitted;
     }
   }
-  // cout << "Integrand: " << integrand << endl;
   return integrand;
 }
 
@@ -348,6 +338,11 @@ float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  )
     float t_bc       = glm::length( intersect_d - vec3( s.orig_start ) );
 
     float t_cb       = glm::length( intersect_e );
+
+    // cout << "Beam: " << t_bc << endl;
+    // cout << "Camera: " << t_cb << endl;
+    Vertex v0; v0.position = vec4( intersect_d, 1.0f );
+    Vertex v1; v1.position = vec4( intersect_e, 1.0f );
 
     transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
   }
@@ -405,7 +400,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_73( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
@@ -467,7 +462,7 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_73( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
