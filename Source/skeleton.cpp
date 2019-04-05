@@ -326,25 +326,39 @@ float Integral_722_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 d
 }
 
 float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  ){
-  vec3 x_1         = vec3( s.start );
-  vec3 beam_dir    = glm::normalize( vec3( s.end ) - x_1 );
-  vec3 camera_dir  = glm::normalize( vec3( dir ) );
-  vec3 b_norm      = -camera_dir;
-  vec3 a_norm      = beam_dir;
-  vec3 v           = glm::cross( a_norm, b_norm );
-  float sin_theta  = glm::length( v );
-  vec3 v_norm      = glm::normalize( v );
-  float distance   = abs( glm::dot( x_1 - i.entry_point, v ) / glm::length( v ) );
-  vec3 x_3         = ( distance * v_norm ) + i.entry_point;
-  vec3 c           =  x_3 - x_1;
-  float s1         = glm::determinant( mat3( c, b_norm, v_norm ) ) /
-                     pow( glm::length( v ), 2 );
-  float s2         = glm::determinant( mat3( c, a_norm, v_norm ) ) /
-                    pow( glm::length( v ), 2 );
-  vec3 intersect_1 = ( x_3 + x_1 + ( a_norm * s1 ) + ( b_norm * s2 ) ) / 2.0f;
-  vec3 intersect_2 = intersect_1 - ( distance * v_norm );
-  float t_bc       = glm::length( ( intersect_1 - x_1 ) / a_norm );
-  float t_cb       = glm::length( ( intersect_2 - i.entry_point ) / b_norm );
+  vec3 x_1         = vec3( s.start );   vec3 x_3 = i.exit_point;
+  vec3 x_2         = vec3( s.end );     vec3 x_4 = i.entry_point;
+  vec3 a           = glm::normalize( x_2 - x_1 );
+  vec3 b           = glm::normalize( x_4 - x_3 );
+  vec3 c           = x_1 - x_3;
+  float a_dot_b    = glm::dot( a, b );
+  float b_dot_c    = glm::dot( b, c );
+  float a_dot_c    = glm::dot( a, c );
+  float a_dot_a    = glm::dot( a, a );
+  float b_dot_b    = glm::dot( b, b );
+  float t_bc       = ( ( -a_dot_b * b_dot_c ) + ( a_dot_c * b_dot_b ) ) /
+                      ( ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b ) );
+  float t_cb       = ( ( a_dot_b * a_dot_c ) - ( b_dot_c * a_dot_a ) ) /
+                      ( ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b ) );
+  float sin_theta  = glm::length( glm::cross( a, b ) );
+  // vec3 beam_dir    = glm::normalize( x_2 - x_1 );
+  // vec3 camera_dir  = glm::normalize( vec3( dir ) );
+  // vec3 b_norm      = -camera_dir;
+  // vec3 a_norm      = beam_dir;
+  // vec3 v           = glm::cross( a_norm, b_norm );
+  // float sin_theta  = glm::length( v );
+  // vec3 v_norm      = glm::normalize( v );
+  // float distance   = abs( glm::dot( x_1 - i.entry_point, v ) / glm::length( v ) );
+  // vec3 x_3         = ( distance * v_norm ) + i.entry_point;
+  // vec3 c           =  x_3 - x_1;
+  // float s1         = glm::determinant( mat3( c, b_norm, v_norm ) ) /
+  //                    pow( glm::length( v ), 2 );
+  // float s2         = glm::determinant( mat3( c, a_norm, v_norm ) ) /
+  //                   pow( glm::length( v ), 2 );
+  // vec3 intersect_1 = ( x_3 + x_1 + ( a_norm * s1 ) + ( b_norm * s2 ) ) / 2.0f;
+  // vec3 intersect_2 = intersect_1 - ( distance * v_norm );
+  // float t_bc       = glm::length( ( intersect_1 - x_1 ) / a_norm );
+  // float t_cb       = glm::length( ( intersect_2 - i.entry_point ) / b_norm );
   float transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
   return ( transmitted / sin_theta );
 }
