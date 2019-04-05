@@ -8,7 +8,7 @@
 
 #define PHOTON_NUMBER 500
 #define BOUNCES 0
-#define ADAPTIVE false
+#define ADAPTIVE true
 
 using namespace std;
 using glm::vec3;
@@ -17,7 +17,7 @@ using glm::vec4;
 using glm::mat4;
 
 vec4 light_position(0,-0.98,-0.2,1);
-vec3 light_power = 0.01f * vec3( 1, 1, 1 );
+vec3 light_power = 0.001f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
