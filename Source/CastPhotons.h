@@ -121,46 +121,65 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
  vector<PhotonSeg> r;
 
  // TODO: Note, if the photon segment lies on a boundary it is ignored
+ bool same = true;
+ int dim   = -1;
  if( ( diff.x > diff.y ) && ( diff.x > diff.z ) ){
    for( int i=0; i<child.size(); i++ ){
      PhotonSeg box = child[i];
      if( box.mid.x < mid.x ){
        l.push_back( box );
+       same = false;
      }  else if( box.mid.x > mid.x ) {
        r.push_back( box );
+       same = false;
      } else {
-       // TODO: what to do here?
        parent->segments[i%2] = child[i];
-       // segments.push_back( child[i] );
      }
    }
+   if( same ) dim = 0;
  } else if( diff.y > diff.z ){
    for( int i=0; i<child.size(); i++ ){
      PhotonSeg box = child[i];
      if( box.mid.y < mid.y ){
        l.push_back( box );
+       same = false;
      }  else if( box.mid.y > mid.y ){
        r.push_back( box );
+       same = false;
      } else {
        // TODO: what to do here?
        parent->segments[i%2] = child[i];
        // segments.push_back( child[i] );
      }
    }
+   if( same ) dim = 1;
  } else {
    for( int i=0; i<child.size(); i++ ){
      PhotonSeg box = child[i];
      if( box.mid.z > mid.z ){
        l.push_back( box );
+       same = false;
      } else if( box.mid.z < mid.z ){
        r.push_back( box );
+       same = false;
      } else {
        // TODO: what to do here?
        parent->segments[i%2] = child[i];
        // segments.push_back( child[i] );
      }
    }
+   if( same ) dim = 2;
  }
+ // TODO: There has to be a better way of doing this
+ // if( same ){
+ //   l.clear();
+ //   r.clear();
+ //   if( dim == 0 ){
+ //     if( diff.y > diff.z ){
+ //
+ //     }
+ //   }
+ // }
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();
  if( l_size != 0 ){
@@ -339,7 +358,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
 
   vec3 energy    = light_power;
 
-    PhotonBeam beam;
+  PhotonBeam beam;
 
 
   for( int i=0; i<number; i++ ){
@@ -450,6 +469,8 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams, 0.0f, radius,
                  triangles, matrix, bounced );
+     } else {
+       beam.absorbed= true;
      }
    } else {
      vec4 top_left  = vec4( -1, -1, -1, 1 );
@@ -521,9 +542,9 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    float scattered  = uniform( generator );
    if( scattered <= ( scattering_c / extinction_c ) ){
-     float t_s         = diff * uniform( generator );
-     vec4 direc        = vec4( glm::normalize( vec3( direction ) ), 0 );
-     vec4 start        = origin + ( t_s * direc );
+     // TODO: check distance is correct
+     float t_s         = -( ( 1 - uniform( generator ) ) / extinction_c );
+     vec4 start        = origin + ( t_s * ( hit.position - origin ) );
      float the         = 2 * PI * uniform( generator );
      float phi         = acos(1 - 2 * uniform( generator ) );
      float x           = sin( phi ) * cos( the );

@@ -379,12 +379,13 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_722( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
 
                 float phase_f  = 1 / ( 4 * PI );
+                // TODO: remove PI for 73
                 float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
@@ -441,11 +442,12 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_722( seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
                 float phase_f  = 1 / ( 4 * PI );
+                // TODO: remove PI for 73
                 float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
