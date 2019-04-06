@@ -297,15 +297,20 @@ float Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir )
 }
 
 float Integral_722( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
-  vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
-  vec3 camera_dir      = glm::normalize( vec3( dir ) );
-  float cos_theta      = glm::dot( beam_dir, -camera_dir );
+  vec3 x_b             = vec3( s.start );
+  vec3 x_e             = vec3( s.end );
+  vec3 beam_dir        = glm::normalize( x_e - x_b );
+  vec3 camera_dir      = -glm::normalize( vec3( dir ) );
+  float cos_theta      = glm::dot( beam_dir, camera_dir );
+
+  float tb_minus       = glm::length( ( i.entry_point - x_b ) / beam_dir );
+  float tb_plus        = glm::length( ( i.exit_point - x_b ) / beam_dir );
 
   float integrand      = 0;
   float dt_b           = 0.001;
 
-  for( float tb=i.tb_minus; tb>i.tb_plus; tb = tb - dt_b ){
-    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - i.tb_minus ) );
+  for( float tb=tb_minus; tb>tb_plus; tb = tb - dt_b ){
+    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
     float constant    = Transmittance( tc, extinction );
     float transmitted = Transmittance( tb, extinction ) * constant;
     if( transmitted > 1e-6 ){
@@ -351,7 +356,7 @@ float Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  )
 
   // cout << ( transmitted / sin_theta ) << endl;
 
-  return ( transmitted / sin_theta );
+  return ( transmitted / sin_theta ) * s.radius;
 }
 
 
@@ -400,13 +405,13 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_722( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
 
                 float phase_f  = 1 / ( 4 * PI );
-                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+                float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
                 // current        += beam.energy * phase_f * rad * _int;
@@ -462,12 +467,12 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_721( seg,
+                float _int     = Integral_722( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
                 float phase_f  = 1 / ( 4 * PI );
-                float rad      = scattering_c / ( pow( seg.radius, 2 ) );
+                float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                 PhotonBeam beam = beams[ seg.id ];
                 // current        += beam.energy * phase_f * rad * _int;
