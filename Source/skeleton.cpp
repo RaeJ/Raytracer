@@ -64,7 +64,6 @@ void Testing( screen* screen,
               vector<PhotonBeam> beams,
               vector<PhotonSeg>& items,
               const mat4& matrix );
-void RecurseTree( Node* parent, const mat4& transform );
 
 // ------------------------------------------------------------------------- //
 
@@ -153,44 +152,10 @@ int main( int argc, char* argv[] )
   return 0;
 }
 
-void RecurseTree( Node* parent, const mat4& transform ){
-  Node* left     = parent->left;
-  Node* right    = parent->right;
-  if( left != NULL){
-    left->aabb.min = transform * left->aabb.min;
-    left->aabb.max = transform * left->aabb.max;
-    left->aabb.mid = transform * left->aabb.mid;
-    for( int i = 0; i<2; i++ ){
-      if( left->segments[i].id != -1 ){
-        left->segments[i].start = transform * left->segments[i].start;
-        left->segments[i].end   = transform * left->segments[i].end;
-        left->segments[i].mid   = transform * left->segments[i].mid;
-        left->segments[i].max   = transform * left->segments[i].max;
-        left->segments[i].orig_start = transform * left->segments[i].orig_start;
-      }
-    }
-    RecurseTree( left, transform );
-  }
-  if( right != NULL){
-    right->aabb.min = transform * right->aabb.min;
-    right->aabb.max = transform * right->aabb.max;
-    right->aabb.mid = transform * right->aabb.mid;
-    for( int i = 0; i<2; i++ ){
-      if( right->segments[i].id != -1 ){
-        right->segments[i].start = transform * right->segments[i].start;
-        right->segments[i].end   = transform * right->segments[i].end;
-        right->segments[i].mid   = transform * right->segments[i].mid;
-        right->segments[i].max   = transform * right->segments[i].max;
-        right->segments[i].orig_start = transform * right->segments[i].orig_start;
-      }
-    }
-    RecurseTree( right, transform );
-  }
-}
 
 void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
 {
-  mat4 inverse_matrix = glm::inverse( root_matrix );
+  // mat4 inverse_matrix = glm::inverse( root_matrix );
   mat4 matrix;
 
   TransformationMatrix( matrix );
@@ -205,6 +170,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   /* Clear buffer */
   // memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
   // Drawing stage
+
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
       vec3 current = vec3( 0, 0, 0 );
@@ -231,13 +197,20 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (float) SSAA );
     }
-
-    // for( int i=0; i<segments.size(); i++ ){
-    //   PositionShader( screen, segments[i].start, vec3(1,0,1));
-    //   PositionShader( screen, segments[i].end, vec3(0,1,1));
+    // for( int i=0; i<beams.size(); i++ ){
+    //   if( i % 50 == 0){
+    //     DrawBeam( screen, beams[i], vec3(0,1,1));
+    //   }
+    //   // PositionShader( screen, segments[i].start, vec3(1,0,1));
+    //   // PositionShader( screen, segments[i].end, vec3(0,1,1));
     //   // AABB box; box.min = segments[i].min; box.max = segments[i].max;
     //   // DrawBoundingBox( screen, box );
     // }
+    // for( int i=0; i<segments.size(); i++ ){
+    //   AABB box; box.min = segments[i].min; box.max = segments[i].max;
+    //   DrawBoundingBox( screen, box );
+    // }
+
     SDL_Renderframe(screen);
   }
 }
@@ -250,7 +223,7 @@ bool Update()
   float dt = float(t2-t);
   t = t2;
   /*Good idea to remove this*/
-  // std::cout << "Render time: " << dt << " ms." << std::endl;
+  std::cout << "Render time: " << dt << " ms." << std::endl;
   /* Update variables*/
   return( UserInput() );
 }
@@ -310,7 +283,8 @@ float Integral_722( PhotonSeg s, CylIntersection i, float extinction, vec4 dir )
   float dt_b           = 0.001;
 
   for( float tb=tb_minus; tb>tb_plus; tb = tb - dt_b ){
-    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
+    // Note: I changed tb_minus to tb_plus
+    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - tb_plus ) );
     float constant    = Transmittance( tc, extinction );
     float transmitted = Transmittance( tb, extinction ) * constant;
     if( transmitted > 1e-6 ){

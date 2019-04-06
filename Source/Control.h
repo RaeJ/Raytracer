@@ -6,8 +6,8 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 500
-#define BOUNCES 8
+#define PHOTON_NUMBER 100
+#define BOUNCES 2
 #define ADAPTIVE false
 
 #define ABSORBED 0.08
