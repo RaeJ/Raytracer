@@ -339,7 +339,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float cos_x  = glm::dot( abs( dir ), x_dir );
    float cos_y  = glm::dot( abs( dir ), y_dir );
 
-   float step   = 0.02;
+   float step   = length; //0.02;
 
    if( b.ada_width ){
      step = length;

@@ -6,12 +6,12 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 500
-#define BOUNCES 20
+#define PHOTON_NUMBER 5
+#define BOUNCES 0
 #define ADAPTIVE false
 
 // TODO: Should fix absorbed at some point
-#define ABSORBED 0.0f
+#define ABSORBED 0.00f
 
 using namespace std;
 using glm::vec3;
@@ -20,7 +20,7 @@ using glm::vec4;
 using glm::mat4;
 
 vec4 light_position(0,-0.98,-0.2,1);
-vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+vec3 light_power = 0.01f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
