@@ -132,9 +132,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }  else if( box.mid.x > mid.x ) {
        r.push_back( box );
        same = false;
-     } else {
-       parent->segments[i%2] = child[i];
      }
+     // else {
+     //   parent->segments[i%2] = child[i];
+     // }
    }
    if( same ) dim = 0;
  } else if( diff.y > diff.z ){
@@ -146,11 +147,12 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }  else if( box.mid.y > mid.y ){
        r.push_back( box );
        same = false;
-     } else {
-       // TODO: what to do here?
-       parent->segments[i%2] = child[i];
-       // segments.push_back( child[i] );
      }
+     // else {
+     //   // TODO: what to do here?
+     //   parent->segments[i%2] = child[i];
+     //   // segments.push_back( child[i] );
+     // }
    }
    if( same ) dim = 1;
  } else {
@@ -162,24 +164,113 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      } else if( box.mid.z < mid.z ){
        r.push_back( box );
        same = false;
-     } else {
-       // TODO: what to do here?
-       parent->segments[i%2] = child[i];
-       // segments.push_back( child[i] );
      }
+     // else {
+     //   // TODO: what to do here?
+     //   parent->segments[i%2] = child[i];
+     //   // segments.push_back( child[i] );
+     // }
    }
    if( same ) dim = 2;
  }
  // TODO: There has to be a better way of doing this
- // if( same ){
- //   l.clear();
- //   r.clear();
- //   if( dim == 0 ){
- //     if( diff.y > diff.z ){
- //
- //     }
- //   }
- // }
+ if( same ){
+   l.clear();
+   r.clear();
+   if( dim == 0 ){
+     if( diff.y > diff.z ){
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.y < mid.y ){
+           l.push_back( box );
+           same = false;
+         }  else if( box.mid.y > mid.y ){
+           r.push_back( box );
+           same = false;
+         } else {
+           // TODO: what to do here?
+           parent->segments[i%2] = child[i];
+           // segments.push_back( child[i] );
+         }
+       }
+     } else {
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.z > mid.z ){
+           l.push_back( box );
+           same = false;
+         } else if( box.mid.z < mid.z ){
+           r.push_back( box );
+           same = false;
+         } else {
+           // TODO: what to do here?
+           parent->segments[i%2] = child[i];
+           // segments.push_back( child[i] );
+         }
+       }
+     }
+   } else if( dim == 1 ){
+     if( diff.x > diff.z ){
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.x < mid.x ){
+           l.push_back( box );
+           same = false;
+         }  else if( box.mid.x > mid.x ) {
+           r.push_back( box );
+           same = false;
+         } else {
+           parent->segments[i%2] = child[i];
+         }
+       }
+     } else {
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.z > mid.z ){
+           l.push_back( box );
+           same = false;
+         } else if( box.mid.z < mid.z ){
+           r.push_back( box );
+           same = false;
+         } else {
+           // TODO: what to do here?
+           parent->segments[i%2] = child[i];
+           // segments.push_back( child[i] );
+         }
+       }
+     }
+   } else if( dim == 2 ){
+     if( diff.x > diff.y ){
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.x < mid.x ){
+           l.push_back( box );
+           same = false;
+         }  else if( box.mid.x > mid.x ) {
+           r.push_back( box );
+           same = false;
+         } else {
+           parent->segments[i%2] = child[i];
+         }
+       }
+     } else {
+       for( int i=0; i<child.size(); i++ ){
+         PhotonSeg box = child[i];
+         if( box.mid.y < mid.y ){
+           l.push_back( box );
+           same = false;
+         }  else if( box.mid.y > mid.y ){
+           r.push_back( box );
+           same = false;
+         } else {
+           // TODO: what to do here?
+           parent->segments[i%2] = child[i];
+           // segments.push_back( child[i] );
+         }
+       }
+     }
+   }
+ }
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();
  if( l_size != 0 ){
