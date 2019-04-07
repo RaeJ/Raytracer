@@ -527,7 +527,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      beam.end       = hit.position;
 
      float absorbed = uniform( generator );
-     if( absorbed <= ABSORBED ){
+     if( absorbed < ABSORBED ){
        beam.absorbed= true;
      } else{
        beam.absorbed= false;
@@ -560,7 +560,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        CastBeam( num, new_energy, hit.position, reflected,
                  min_point, max_point, beams, 0.0f, radius,
                  triangles, matrix, bounced );
-     } else {
+     } else if( ABSORBED > 0 ) {
        beam.absorbed= true;
      }
    } else {
