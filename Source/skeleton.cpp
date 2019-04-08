@@ -322,9 +322,16 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
     denominator = exp( extinction * ( -tb_minus + tc_minus ) ) *
                         extinction * ( abs( cos_theta ) - 1 );
   }
-  if( abs( denominator ) > 1e-6 ){
+  if( abs( denominator ) > 1e-5 ){
     integrand = numerator / denominator;
   }
+
+  // if( glm::length( integrand ) > 10 ){
+  //   cout << "Cos theta: " << cos_theta << endl;
+  //   cout << "Numerator: " << numerator << endl;
+  //   cout << "Denominator: " << denominator << endl;
+  //   PositionShader( screen, vec4(i.entry_point, 1.0f), vec3(0,1,0));
+  // }
 
   // for( float tb=tb_minus; tb<tb_plus; tb = tb + dt_b ){
   //   float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
