@@ -20,7 +20,7 @@ using glm::vec4;
 using glm::mat4;
 
 vec4 light_position(0,-0.98,-0.2,1);
-vec3 light_power = 0.0001f * vec3( 1, 1, 1 );
+vec3 light_power = 0.1f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;

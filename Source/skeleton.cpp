@@ -304,24 +304,36 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
   float dt_b           = 0.001;
   float tc_minus       = glm::length( i.entry_point - vec3( start ) );
 
-  float begin    = tb_minus;
-  float end      = tb_plus;
+  // float begin    = tb_minus;
+  // float end      = tb_plus;
+  // if( begin > end ){
+  //   tb_minus     = end;
+  //   tb_plus      = begin;
+  //   tc_minus     = glm::length( i.exit_point - vec3( start ) );
+  // }
+  float numerator = exp( -extinction * ( tb_minus - tb_plus ) *
+                    ( abs( cos_theta ) - 1 ) ) - 1;
+
+  float denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
+                      extinction * ( abs( cos_theta ) - 1 );
   if( tb_minus > tb_plus ){
-    begin        = tb_plus;
-    end          = tb_minus;
+    numerator   = exp( -extinction * ( tb_minus - tb_plus ) *
+                      ( abs( cos_theta ) + 1 ) ) - 1;
+    denominator = exp( extinction * ( -tb_minus + tc_minus ) ) *
+                        extinction * ( abs( cos_theta ) - 1 );
+  }
+  if( abs( denominator ) > 1e-6 ){
+    integrand = numerator / denominator;
   }
 
-  for( float tb=begin; tb<end; tb = tb + dt_b ){
-    float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
-    if( tb_minus > tb_plus ){
-      tc  = tc_minus - ( abs( cos_theta ) * ( tb_minus - tb ) );
-    }
-    float constant = Transmittance( tc, extinction );
-    float transmitted = Transmittance( tb, extinction ) * constant;
-    if( transmitted > 1e-6 ){
-      integrand += transmitted;
-    }
-  }
+  // for( float tb=tb_minus; tb<tb_plus; tb = tb + dt_b ){
+  //   float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
+  //   float constant = Transmittance( tc, extinction );
+  //   float transmitted = Transmittance( tb, extinction ) * constant;
+  //   if( transmitted > 1e-6 ){
+  //     integrand += transmitted;
+  //   }
+  // }
 
   return integrand;
 }
