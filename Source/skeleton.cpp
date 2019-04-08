@@ -47,7 +47,10 @@ float Integral_721( PhotonSeg s,
                     CylIntersection i,
                     float extinction,
                     vec4 dir  );
-float Integral_722( PhotonSeg s,
+float Integral_722( screen* screen,
+                    const vec4 start,
+                    const vec4 limit,
+                    PhotonSeg s,
                     CylIntersection i,
                     float extinction,
                     vec4 dir );
@@ -170,10 +173,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
   /* Clear buffer */
   // memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
   // Drawing stage
-  for( int i=0; i<segments.size(); i++ ){
-    AABB box; box.min = segments[i].min; box.max = segments[i].max;
-    DrawBoundingBox( screen, box );
-  }
+  // for( int i=0; i<segments.size(); i++ ){
+  //   AABB box; box.min = segments[i].min; box.max = segments[i].max;
+  //   DrawBoundingBox( screen, box );
+  // }
 
   for( int x = 0; x < (SCREEN_WIDTH * SSAA); x+=SSAA ) {
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
@@ -210,10 +213,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     //   // AABB box; box.min = segments[i].min; box.max = segments[i].max;
     //   // DrawBoundingBox( screen, box );
     // }
-    for( int i=0; i<segments.size(); i++ ){
-      AABB box; box.min = segments[i].min; box.max = segments[i].max;
-      DrawBoundingBox( screen, box );
-    }
+    // for( int i=0; i<segments.size(); i++ ){
+    //   AABB box; box.min = segments[i].min; box.max = segments[i].max;
+    //   DrawBoundingBox( screen, box );
+    // }
 
     SDL_Renderframe(screen);
   }
@@ -274,7 +277,8 @@ float Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir )
 }
 
 // TODO: FIX
-float Integral_722( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
+float Integral_722( screen* screen, const vec4 start, const vec4 limit,
+  PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
   vec3 x_b             = vec3( s.start );
   vec3 x_e             = vec3( s.end );
   vec3 beam_dir        = glm::normalize( x_e - x_b );
@@ -283,34 +287,42 @@ float Integral_722( PhotonSeg s, CylIntersection i, float extinction, vec4 dir )
 
   float tb_minus, tb_plus;
   if( abs( cos_theta ) <= 1e-6 ){
-    // TODO: Work out what I should actually do in this situation
-    // tb_minus = 2 * glm::length( i.entry_point - vec3( s.orig_start ) );
-    // tb_plus  = 0.0f;
-    cout << "Here" << endl;
     tb_minus = 0.0f;
-    tb_plus  = 0.0f;
+    tb_plus  = glm::length( vec3( limit ) - vec3( s.orig_start ) );
+    PositionShader( screen, vec4(i.entry_point, 1.0f), vec3(0,1,0));
   } else {
-    float t_min = glm::length( glm::dot( ( i.entry_point - x_b ), camera_dir ) / cos_theta );
+    float t_min = glm::dot( ( i.entry_point - x_b ), camera_dir ) / cos_theta;
     vec3 p_min  = x_b + ( beam_dir * t_min );
     tb_minus    = glm::length( p_min - vec3( s.orig_start ) );
 
-    float t_max = glm::length( glm::dot( ( i.exit_point - x_b ), camera_dir ) / cos_theta );
+    float t_max = glm::dot( ( i.exit_point - x_b ), camera_dir ) / cos_theta;
     vec3 p_max  = x_b + ( beam_dir * t_max );
     tb_plus     = glm::length( p_max - vec3( s.orig_start ) );
   }
 
-
   float integrand      = 0;
   float dt_b           = 0.001;
+  float tc_minus       = glm::length( i.entry_point - vec3( start ) );
 
-  for( float tb=tb_minus; tb<tb_plus; tb = tb + dt_b ){
-    float tc          = i.tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
-    float constant    = Transmittance( tc, extinction );
+  float begin    = tb_minus;
+  float end      = tb_plus;
+  if( tb_minus > tb_plus ){
+    begin        = tb_plus;
+    end          = tb_minus;
+  }
+
+  for( float tb=begin; tb<end; tb = tb + dt_b ){
+    float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
+    if( tb_minus > tb_plus ){
+      tc  = tc_minus - ( abs( cos_theta ) * ( tb_minus - tb ) );
+    }
+    float constant = Transmittance( tc, extinction );
     float transmitted = Transmittance( tb, extinction ) * constant;
     if( transmitted > 1e-6 ){
       integrand += transmitted;
     }
   }
+
   return integrand;
 }
 
@@ -399,7 +411,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_722( seg,
+                float _int     = Integral_722( screen,
+                                               start,
+                                               limit.position,
+                                               seg,
                                                intersect,
                                                extinction_c,
                                                dir );
@@ -465,7 +480,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_722( seg,
+                float _int     = Integral_722( screen,
+                                               start,
+                                               limit.position,
+                                               seg,
                                                intersect,
                                                extinction_c,
                                                dir );
