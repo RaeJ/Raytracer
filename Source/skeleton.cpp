@@ -313,7 +313,7 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
   if( begin > end ){
     tb_minus     = end;
     tb_plus      = begin;
-    tc_minus     = glm::length( i.exit_point - vec3( start ) );
+    // tc_minus     = glm::length( i.exit_point - vec3( start ) );
   }
   // float numerator = exp( -extinction * ( tb_minus - tb_plus ) *
   //                   ( abs( cos_theta ) - 1 ) ) - 1;
