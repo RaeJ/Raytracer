@@ -342,6 +342,7 @@ bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
 
     float b24ac = b*b - 4*a*c;
 
+
     if( b24ac < 0 ) return false;
 
     float sqb24ac = sqrtf(b24ac);
@@ -379,6 +380,7 @@ bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     else if ( y0 >= 0 && y0 <= 1 )
     {
       // hit the cylinder bit
+      // if( t0 <= 0 ) cout << "false" << endl;
       if( t0 <= 0 ) return false;
       first_hit = origin_prime + ( dir_prime * t0 );
       first_inte = true;

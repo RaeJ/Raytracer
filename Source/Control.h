@@ -10,6 +10,8 @@
 #define BOUNCES 20
 #define ADAPTIVE false
 
+#define EXT_ANALYSIS 0.04f
+
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.00f
 

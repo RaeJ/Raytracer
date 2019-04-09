@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "CastPhotons.h"
+#include "Analysis.h"
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -121,37 +122,40 @@ void Testing( screen* screen,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
-  CreateSurface( 10, 0.0, 1.004 );
+  RunAnalysis();
+  // CreateSurface( 10, 0.0, 1.004 );
+  //
+  // vector<PhotonBeam> beams;
+  // vector<PhotonSeg> items;
+  //
+  // LoadTestModel( triangles );
 
-  vector<PhotonBeam> beams;
-  vector<PhotonSeg> items;
 
-  LoadTestModel( triangles );
 
-  cout << "Casting photons" << endl;
-  mat4 matrix;  TransformationMatrix( matrix );
-  root_matrix = matrix;
-  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-  BoundPhotonBeams( beams, items, triangles );
-  cout << "Beams size: " << beams.size() << "\n";
-  cout << "Segment size: " << items.size() << "\n";
-  root = newNode( root_aabb );
-  cout << "Building tree" << endl;
-  BuildTree( root, items );
-  cout << "Calculating radiance" << endl;
+  // cout << "Casting photons" << endl;
+  // mat4 matrix;  TransformationMatrix( matrix );
+  // root_matrix = matrix;
+  // root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+  // BoundPhotonBeams( beams, items, triangles );
+  // cout << "Beams size: " << beams.size() << "\n";
+  // cout << "Segment size: " << items.size() << "\n";
+  // root = newNode( root_aabb );
+  // cout << "Building tree" << endl;
+  // BuildTree( root, items );
+  // cout << "Calculating radiance" << endl;
+  //
+  // screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+  // // Draw( screen, beams, items );
+  //
+  // while( Update() )
+  //   {
+  //     Draw( screen, beams, items );
+  //     SDL_Renderframe(screen);
+  //   }
 
-  screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-  // Draw( screen, beams, items );
+  // SDL_SaveImage( screen, "screenshot.bmp" );
 
-  while( Update() )
-    {
-      Draw( screen, beams, items );
-      SDL_Renderframe(screen);
-    }
-
-  SDL_SaveImage( screen, "screenshot.bmp" );
-
-  KillSDL(screen);
+  // KillSDL(screen);
   return 0;
 }
 
@@ -301,7 +305,7 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
   }
 
   float integrand      = 0;
-  float dt_b           = 0.001;
+  // float dt_b           = 0.001;
   float tc_minus       = glm::length( i.entry_point - vec3( start ) );
 
   // float begin    = tb_minus;
@@ -322,6 +326,12 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
     denominator = exp( extinction * ( -tb_minus + tc_minus ) ) *
                         extinction * ( abs( cos_theta ) - 1 );
   }
+  // if( tb_minus > tb_plus ){
+  //   numerator   = exp( -extinction * ( tb_minus - tb_plus ) *
+  //                     ( abs( cos_theta ) - 1 ) ) - 1;
+  //   denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
+  //                       -extinction * ( abs( cos_theta ) + 1 );
+  // }
   if( abs( denominator ) > 1e-5 ){
     integrand = numerator / denominator;
   }
