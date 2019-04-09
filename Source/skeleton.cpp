@@ -122,40 +122,40 @@ void Testing( screen* screen,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
-  // RunAnalysis();
-  CreateSurface( 10, 0.0, 1.004 );
-
-  vector<PhotonBeam> beams;
-  vector<PhotonSeg> items;
-
-  LoadTestModel( triangles );
-
-
-
-  cout << "Casting photons" << endl;
-  mat4 matrix;  TransformationMatrix( matrix );
-  root_matrix = matrix;
-  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-  BoundPhotonBeams( beams, items, triangles );
-  cout << "Beams size: " << beams.size() << "\n";
-  cout << "Segment size: " << items.size() << "\n";
-  root = newNode( root_aabb );
-  cout << "Building tree" << endl;
-  BuildTree( root, items );
-  cout << "Calculating radiance" << endl;
-
-  screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-  // Draw( screen, beams, items );
-
-  while( Update() )
-    {
-      Draw( screen, beams, items );
-      SDL_Renderframe(screen);
-    }
-
-  SDL_SaveImage( screen, "screenshot.bmp" );
-
-  KillSDL(screen);
+  RunAnalysis();
+  // CreateSurface( 10, 0.0, 1.004 );
+  //
+  // vector<PhotonBeam> beams;
+  // vector<PhotonSeg> items;
+  //
+  // LoadTestModel( triangles );
+  //
+  //
+  //
+  // cout << "Casting photons" << endl;
+  // mat4 matrix;  TransformationMatrix( matrix );
+  // root_matrix = matrix;
+  // root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+  // BoundPhotonBeams( beams, items, triangles );
+  // cout << "Beams size: " << beams.size() << "\n";
+  // cout << "Segment size: " << items.size() << "\n";
+  // root = newNode( root_aabb );
+  // cout << "Building tree" << endl;
+  // BuildTree( root, items );
+  // cout << "Calculating radiance" << endl;
+  //
+  // screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+  // // Draw( screen, beams, items );
+  //
+  // while( Update() )
+  //   {
+  //     Draw( screen, beams, items );
+  //     SDL_Renderframe(screen);
+  //   }
+  //
+  // SDL_SaveImage( screen, "screenshot.bmp" );
+  //
+  // KillSDL(screen);
   return 0;
 }
 
@@ -440,17 +440,17 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                // float _int     = Integral_721( seg,
-                //                                intersect,
-                //                                extinction_c,
-                //                                dir );
-                float _int     = Integral_722( screen,
-                                               start,
-                                               limit.position,
-                                               seg,
+                float _int     = Integral_721( seg,
                                                intersect,
                                                extinction_c,
                                                dir );
+                // float _int     = Integral_722( screen,
+                //                                start,
+                //                                limit.position,
+                //                                seg,
+                //                                intersect,
+                //                                extinction_c,
+                //                                dir );
 
                 float phase_f  = 1 / ( 4 * PI );
                 // TODO: remove PI for 73
@@ -513,17 +513,17 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                float _int     = Integral_722( screen,
-                                               start,
-                                               limit.position,
-                                               seg,
-                                               intersect,
-                                               extinction_c,
-                                               dir );
-                 // float _int     = Integral_721( seg,
-                 //                                intersect,
-                 //                                extinction_c,
-                 //                                dir );
+                // float _int     = Integral_722( screen,
+                //                                start,
+                //                                limit.position,
+                //                                seg,
+                //                                intersect,
+                //                                extinction_c,
+                //                                dir );
+                 float _int     = Integral_721( seg,
+                                                intersect,
+                                                extinction_c,
+                                                dir );
                 float phase_f  = 1 / ( 4 * PI );
                 // TODO: remove PI for 73
                 float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );

@@ -60,8 +60,8 @@ vector<PhotonSeg> segments;
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
-// std::uniform_real_distribution<double> uniform_small(0.01, 0.1);
-std::uniform_real_distribution<double> uniform_small(0.01, 0.04);
+// std::uniform_real_distribution<double> uniform_small(0.05, 0.1);
+std::uniform_real_distribution<double> uniform_small(0.02, 0.06);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
 
 // -------------------------------------------------------------------------- //
