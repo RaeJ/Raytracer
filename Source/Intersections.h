@@ -336,9 +336,13 @@ bool HitCylinder( const vec4 start, const vec4 dir, const PhotonSeg& seg,
     float b = 2 * origin_prime[0] * dir_prime[0]
             + 2 * origin_prime[2] * dir_prime[2];
 
+    // TODO: Work out which of the below is correct
     float c = origin_prime[0] * origin_prime[0]
             + origin_prime[2] * origin_prime[2]
-            - pow( seg.radius, 2 );
+            - pow( seg.radius * S_inv, 2 );
+    // float c = origin_prime[0] * origin_prime[0]
+    //         + origin_prime[2] * origin_prime[2]
+    //         - pow( seg.radius, 2 );
 
     float b24ac = b*b - 4*a*c;
 

@@ -122,40 +122,40 @@ void Testing( screen* screen,
 int main( int argc, char* argv[] )
 {
   srand (time(NULL));
-  RunAnalysis();
-  // CreateSurface( 10, 0.0, 1.004 );
-  //
-  // vector<PhotonBeam> beams;
-  // vector<PhotonSeg> items;
-  //
-  // LoadTestModel( triangles );
+  // RunAnalysis();
+  CreateSurface( 10, 0.0, 1.004 );
+
+  vector<PhotonBeam> beams;
+  vector<PhotonSeg> items;
+
+  LoadTestModel( triangles );
 
 
 
-  // cout << "Casting photons" << endl;
-  // mat4 matrix;  TransformationMatrix( matrix );
-  // root_matrix = matrix;
-  // root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-  // BoundPhotonBeams( beams, items, triangles );
-  // cout << "Beams size: " << beams.size() << "\n";
-  // cout << "Segment size: " << items.size() << "\n";
-  // root = newNode( root_aabb );
-  // cout << "Building tree" << endl;
-  // BuildTree( root, items );
-  // cout << "Calculating radiance" << endl;
-  //
-  // screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-  // // Draw( screen, beams, items );
-  //
-  // while( Update() )
-  //   {
-  //     Draw( screen, beams, items );
-  //     SDL_Renderframe(screen);
-  //   }
+  cout << "Casting photons" << endl;
+  mat4 matrix;  TransformationMatrix( matrix );
+  root_matrix = matrix;
+  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+  BoundPhotonBeams( beams, items, triangles );
+  cout << "Beams size: " << beams.size() << "\n";
+  cout << "Segment size: " << items.size() << "\n";
+  root = newNode( root_aabb );
+  cout << "Building tree" << endl;
+  BuildTree( root, items );
+  cout << "Calculating radiance" << endl;
 
-  // SDL_SaveImage( screen, "screenshot.bmp" );
+  screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+  // Draw( screen, beams, items );
 
-  // KillSDL(screen);
+  while( Update() )
+    {
+      Draw( screen, beams, items );
+      SDL_Renderframe(screen);
+    }
+
+  SDL_SaveImage( screen, "screenshot.bmp" );
+
+  KillSDL(screen);
   return 0;
 }
 
@@ -305,36 +305,36 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
   }
 
   float integrand      = 0;
-  // float dt_b           = 0.001;
+  float dt_b           = 0.001;
   float tc_minus       = glm::length( i.entry_point - vec3( start ) );
 
-  // float begin    = tb_minus;
-  // float end      = tb_plus;
-  // if( begin > end ){
-  //   tb_minus     = end;
-  //   tb_plus      = begin;
-  //   tc_minus     = glm::length( i.exit_point - vec3( start ) );
-  // }
-  float numerator = exp( -extinction * ( tb_minus - tb_plus ) *
-                    ( abs( cos_theta ) - 1 ) ) - 1;
-
-  float denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
-                      extinction * ( abs( cos_theta ) - 1 );
-  if( tb_minus > tb_plus ){
-    numerator   = exp( -extinction * ( tb_minus - tb_plus ) *
-                      ( abs( cos_theta ) + 1 ) ) - 1;
-    denominator = exp( extinction * ( -tb_minus + tc_minus ) ) *
-                        extinction * ( abs( cos_theta ) - 1 );
+  float begin    = tb_minus;
+  float end      = tb_plus;
+  if( begin > end ){
+    tb_minus     = end;
+    tb_plus      = begin;
+    tc_minus     = glm::length( i.exit_point - vec3( start ) );
   }
+  // float numerator = exp( -extinction * ( tb_minus - tb_plus ) *
+  //                   ( abs( cos_theta ) - 1 ) ) - 1;
+  //
+  // float denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
+  //                     extinction * ( abs( cos_theta ) - 1 );
   // if( tb_minus > tb_plus ){
   //   numerator   = exp( -extinction * ( tb_minus - tb_plus ) *
-  //                     ( abs( cos_theta ) - 1 ) ) - 1;
-  //   denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
-  //                       -extinction * ( abs( cos_theta ) + 1 );
+  //                     ( abs( cos_theta ) + 1 ) ) - 1;
+  //   denominator = exp( extinction * ( -tb_minus + tc_minus ) ) *
+  //                       extinction * ( abs( cos_theta ) - 1 );
   // }
-  if( abs( denominator ) > 1e-5 ){
-    integrand = numerator / denominator;
-  }
+  // // if( tb_minus > tb_plus ){
+  // //   numerator   = exp( -extinction * ( tb_minus - tb_plus ) *
+  // //                     ( abs( cos_theta ) - 1 ) ) - 1;
+  // //   denominator = exp( extinction * ( tb_minus + tc_minus ) ) *
+  // //                       -extinction * ( abs( cos_theta ) + 1 );
+  // // }
+  // if( abs( denominator ) > 1e-5 ){
+  //   integrand = numerator / denominator;
+  // }
 
   // if( glm::length( integrand ) > 10 ){
   //   cout << "Cos theta: " << cos_theta << endl;
@@ -343,14 +343,14 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
   //   PositionShader( screen, vec4(i.entry_point, 1.0f), vec3(0,1,0));
   // }
 
-  // for( float tb=tb_minus; tb<tb_plus; tb = tb + dt_b ){
-  //   float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
-  //   float constant = Transmittance( tc, extinction );
-  //   float transmitted = Transmittance( tb, extinction ) * constant;
-  //   if( transmitted > 1e-6 ){
-  //     integrand += transmitted;
-  //   }
-  // }
+  for( float tb=tb_minus; tb<tb_plus; tb = tb + dt_b ){
+    float tc  = tc_minus - ( abs( cos_theta ) * ( tb - tb_minus ) );
+    float constant = Transmittance( tc, extinction );
+    float transmitted = Transmittance( tb, extinction ) * constant;
+    if( transmitted > 1e-6 ){
+      integrand += transmitted;
+    }
+  }
 
   return integrand;
 }
@@ -440,6 +440,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
               }
             } else if( HitCylinder( start, dir, seg, intersect ) ){
               if( intersect.valid ){
+                // float _int     = Integral_721( seg,
+                //                                intersect,
+                //                                extinction_c,
+                //                                dir );
                 float _int     = Integral_722( screen,
                                                start,
                                                limit.position,
@@ -516,6 +520,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                                                intersect,
                                                extinction_c,
                                                dir );
+                 // float _int     = Integral_721( seg,
+                 //                                intersect,
+                 //                                extinction_c,
+                 //                                dir );
                 float phase_f  = 1 / ( 4 * PI );
                 // TODO: remove PI for 73
                 float rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
