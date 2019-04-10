@@ -24,10 +24,17 @@ bool CylinderIntersection( const vec3 a, const vec3 a_omega,
                            const vec3 c, const vec3 c_omega,
                            const float kernel_width,
                            BasicIntersection& intersection );
-void BB2D1( const float kernel_width, const int dimension,
+void BsBs2D1( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
-            bool& initial,
+            std::ofstream& file );
+void BsBs1D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
+void BlBl2D1( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
 
 void RunAnalysis(){
@@ -40,45 +47,71 @@ void RunAnalysis(){
 
   float delta_width = 0.02 * mfp;
 
-  bool initial = true;
-  for( float kernel_width = 0; kernel_width < ( 5 * mfp ); kernel_width = kernel_width + delta_width ){
-      BB2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, initial, myfile );
+  for( float kernel_width = delta_width; kernel_width < ( 5 * mfp ); kernel_width = kernel_width + delta_width ){
+    myfile << kernel_width;
+    BsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    BsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    myfile << "\n";
   }
   myfile.close();
 }
 
-void BB2D1( const float kernel_width, const int dimension,
+void BsBs1D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
-            bool& initial,
             std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
 
-    BasicIntersection intersect;
-    if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
-      float tc_minus = glm::length( intersect.entry_point - c );
-      float tc_plus  = glm::length( intersect.exit_point - c );
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        Tr( t_a ) * Tr( t_c );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( Tr( t_a ) * Tr( t_c ) ) -
+                        ( pow( Tr( t_a ), 2 ) * pow( Tr( t_c ), 2 ) ) );
 
-      // NOTE: does not include the phase
-      float expectation = pow( kernel_width, -dimension ) *
-                          Tr( t_a ) *
-                          TrPrime( tc_minus, tc_plus );
-      float variance    = pow( kernel_width, -dimension * 2 ) *
-                          ( Tr( t_a ) * ( 2 / pow( analysis_extinction, 2 ) ) *
-                          ( Tr( tc_minus ) + ( Tr( tc_plus ) *
-                          ( ( ( tc_minus - tc_plus ) * analysis_extinction ) -1 ) ) ) -
-                          ( pow( Tr( t_a ), 2 ) * pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
+    float nsd         = sqrtf( variance ) / expectation;
 
-      float nsd         = sqrtf( variance ) / expectation;
+    file << "," << to_string( nsd );
+  }
+}
 
-      if( kernel_width > 0 ){
-        if( initial ){
-          file << kernel_width << "," << to_string( nsd );
-          initial = false;
-        } else {
-          file << "\n" << kernel_width << "," << to_string( nsd );
-        }
-      }
-    }
+void BlBl2D1( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+
+    float nsd         = 0;
+
+    file << "," << to_string( nsd );
+  }
+}
+
+void BsBs2D1( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+    float tc_minus = glm::length( intersect.entry_point - c );
+    float tc_plus  = glm::length( intersect.exit_point - c );
+
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        Tr( t_a ) *
+                        TrPrime( tc_minus, tc_plus );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( Tr( t_a ) * ( 2 / pow( analysis_extinction, 2 ) ) *
+                        ( Tr( tc_minus ) + ( Tr( tc_plus ) *
+                        ( ( ( tc_minus - tc_plus ) * analysis_extinction ) -1 ) ) ) -
+                        ( pow( Tr( t_a ), 2 ) * pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  }
 }
 
 void SetUpAnalysis( vec3& a, vec3& c, vec3& omega_a, vec3& omega_c,
