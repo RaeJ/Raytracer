@@ -44,6 +44,10 @@ void BlBl2D1( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
+void PBl3D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
 
 
 void RunAnalysis(){
@@ -61,9 +65,37 @@ void RunAnalysis(){
     BsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    PBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     myfile << "\n";
   }
   myfile.close();
+}
+
+void PBl3D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  vec3 centre = a + ( t_a * omega_a );
+  if( SphereIntersection( c, omega_c, kernel_width, centre, intersect ) ){
+    float tc_minus = glm::length( intersect.entry_point - c );
+    float tc_plus  = glm::length( intersect.exit_point - c );
+    float ta_minus = glm::length( centre - a ) - kernel_width;
+    float ta_plus  = glm::length( centre - a ) + kernel_width;
+
+    float expectation = pow( kernel_width, -dimension ) *
+                        TrPrime( ta_minus, ta_plus ) *
+                        TrPrime( tc_minus, tc_plus );
+
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
+                        TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
+                        ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  }
 }
 
 void BsBl2D2( const float kernel_width, const int dimension,

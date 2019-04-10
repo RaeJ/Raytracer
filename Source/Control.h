@@ -7,10 +7,10 @@
 #define SSAA 1
 
 #define PHOTON_NUMBER 500
-#define BOUNCES 20
+#define BOUNCES 0
 #define ADAPTIVE false
 
-#define RUN_ANALYSIS false
+#define RUN_ANALYSIS true
 #define EXT_ANALYSIS 0.04f
 
 // TODO: Should fix absorbed at some point

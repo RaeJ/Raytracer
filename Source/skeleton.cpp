@@ -104,19 +104,13 @@ void Testing( screen* screen,
         r_dot_n = 0;
       }
       current += ( light_power * r_dot_n ) / A;
-    } else if( ClosestIntersection( start, direction, c_i, matrix, triangles )  ){
-      Triangle close = triangles[c_i.index];
-      if( c_i.water ){
-        close = waves[ c_i.index - triangles.size() ];
-      }
-
-      colour = close.colour;
-      current += DirectLight( c_i );
-    // PhotonBeam b;
-    // b.start = debugging.start;
-    // b.end = debugging.end;
-    // DrawBeam( screen, b, vec3(0,1,0) );
-  }
+    }
+    vec4 center = matrix * vec4( 0.8, 1, -0.5, 1 );
+    float radius = 0.2;
+    BasicIntersection intersect2;
+    if( SphereIntersection( vec3( start ), vec3( direction ), radius, vec3( center ), intersect2 ) ){
+      colour = vec3( 0.3, 0, 0.7 );
+    }
 }
 
 int main( int argc, char* argv[] )
