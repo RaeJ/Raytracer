@@ -163,7 +163,7 @@ bool HitCone( const vec4 start, const vec4 dir, const PhotonSeg& seg,
 
     // vec3 apex            = ( R_inv * ( vec3( seg.orig_start ) * S_inv  ) ) + T_inv;
     float height         = glm::length( seg.end - seg.orig_start );
-    float r1             = seg.radius;
+    float r1             = seg.radius * S_inv;
     // float r2             = r1 * glm::length( apex - vec3( seg.start ) ) /
     //                        glm::length( apex - vec3( seg.orig_start ) );
     float tan_theta      = r1 / height;

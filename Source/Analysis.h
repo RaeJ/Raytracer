@@ -24,7 +24,15 @@ bool CylinderIntersection( const vec3 a, const vec3 a_omega,
                            const vec3 c, const vec3 c_omega,
                            const float kernel_width,
                            BasicIntersection& intersection );
+bool SphereIntersection( const vec3 p, const vec3 dir,
+                         const float kernel_width,
+                         const vec3 centre,
+                         BasicIntersection& intersection );
 void BsBs2D1( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
+void BsBl2D2( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
@@ -36,6 +44,7 @@ void BlBl2D1( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
+
 
 void RunAnalysis(){
   std::ofstream myfile;
@@ -51,9 +60,36 @@ void RunAnalysis(){
     myfile << kernel_width;
     BsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    BsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     myfile << "\n";
   }
   myfile.close();
+}
+
+void BsBl2D2( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+    // NOTE: I am not sure that this is the way to do it
+    float ta_minus = glm::length( intersect.entry_point - c );
+    float ta_plus  = glm::length( intersect.exit_point - c );
+
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        TrPrime( ta_minus, ta_plus ) *
+                        Tr( t_c );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( pow( Tr( t_c ), 2 ) * ( 2 / pow( analysis_extinction, 2 ) ) *
+                        ( Tr( ta_minus ) + ( Tr( ta_plus ) *
+                        ( ( ( ta_minus - ta_plus ) * analysis_extinction ) - 1 ) ) ) -
+                        ( pow( Tr( t_c ), 2 ) * pow( TrPrime( ta_minus, ta_plus ), 2 ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  }
 }
 
 void BsBs1D( const float kernel_width, const int dimension,
@@ -144,6 +180,49 @@ float Tr( float length ){
 float TrPrime( float t_min, float t_plus ){
   float numerator = Tr( t_min ) - Tr( t_plus );
   return ( numerator / analysis_extinction );
+}
+
+bool SphereIntersection( const vec3 p, const vec3 dir,
+                           const float kernel_width,
+                           const vec3 centre,
+                           BasicIntersection& intersection ){
+  vec3 vpc = centre - p;  // this is the vector from p to c
+  float cos_theta = glm::dot( vpc, dir ) /
+                    ( glm::length( vpc ) * glm::length( dir ) );
+  float distance  = cos_theta * glm::length( vpc );
+  vec3 pc         = p + ( distance * dir );
+
+  if ( glm::dot( vpc, dir ) < 0 ){
+    if ( glm::length( vpc ) > kernel_width ){
+      return false;
+    }
+    else if ( glm::length( vpc ) == kernel_width ){
+      intersection.entry_point = p;
+      intersection.exit_point  = p;
+    } else {
+      float dist = sqrt( pow( kernel_width, 2 ) - pow( glm::length( pc - centre ), 2 ) );
+      float di1  = dist - glm::length( pc - p );
+      intersection.entry_point = p;
+      intersection.exit_point  = p + ( dir * di1 );
+    }
+  } else{
+    if( glm::length( centre - pc ) > kernel_width ){
+      return false;
+    } else {
+      float dist = sqrt( pow( kernel_width, 2 ) - pow( glm::length( pc - centre ), 2 ) );
+      float di1;
+      if( glm::length( vpc ) > kernel_width ){
+        di1 = glm::length( pc - p ) - dist;
+      } else {
+        di1 = glm::length( pc - p ) + dist;
+      }
+      intersection.entry_point = p + ( dir * di1 );
+      float di2                = di1 + ( 2 *
+                                 glm::length( pc - intersection.entry_point ) );
+      intersection.exit_point  = p + ( dir * di2 );
+    }
+  }
+  return true;
 }
 
 bool CylinderIntersection( const vec3 a, const vec3 a_omega,
