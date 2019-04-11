@@ -80,7 +80,7 @@ void RunAnalysis(){
     PBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBl1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BlBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
-    // BlP3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    BlP3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     myfile << "\n";
   }
   myfile.close();
@@ -90,16 +90,17 @@ void BlP3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file ){
-  BasicIntersection intersect1;
+  BasicIntersection intersect;
   vec3 point         = c + ( t_c * omega_c );
-  BasicIntersection intersect2;
-  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect1 ) &&
-      SphereIntersection( a, omega_a, kernel_width, point, intersect2 ) ){
-    float ta_minus    = glm::length( a - intersect2.entry_point );
-    float ta_plus     = glm::length( a - intersect2.exit_point );
+  if( SphereIntersection( a, omega_a, kernel_width, point, intersect ) ){
+    float ta_minus    = glm::length( a - intersect.entry_point );
+    float ta_plus     = glm::length( a - intersect.exit_point );
 
-    float tc_minus    = t_c - kernel_width;
-    float tc_plus     = t_c + kernel_width;
+    vec3 midpoint  = ( intersect.entry_point + intersect.exit_point ) / 2.0f;
+    float distance = glm::length( c - midpoint );
+
+    float tc_minus = fmax( t_c - kernel_width, distance - kernel_width );
+    float tc_plus  = fmin( t_c + kernel_width, distance + kernel_width );
 
 
     // NOTE: does not include the phase
@@ -162,6 +163,40 @@ void BsBl1D( const float kernel_width, const int dimension,
   }
 }
 
+void PBs2D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  vec3 centre = a + ( t_a * omega_a );
+  if( SphereIntersection( c, omega_c, kernel_width, centre, intersect ) ){
+    float tc_minus = glm::length( intersect.entry_point - c );
+    float tc_plus  = glm::length( intersect.exit_point - c );
+
+    // vec3 midpoint  = ( intersect.entry_point + intersect.exit_point ) / 2.0f;
+    // float distance = glm::length( a - midpoint );
+    //
+    // float ta_minus = fmax( t_a - kernel_width, distance - kernel_width );
+    // float ta_plus  = fmin( t_a + kernel_width, distance + kernel_width );
+    //
+    // float expectation = pow( kernel_width, -dimension ) *
+    //                     TrPrime( ta_minus, ta_plus ) *
+    //                     TrPrime( tc_minus, tc_plus );
+    //
+    // float variance    = pow( kernel_width, -dimension * 2 ) *
+    //                     ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
+    //                     pow( TrPrime( tc_minus, tc_plus ), 2 ) ) -
+    //                     ( pow( TrPrime( ta_minus, ta_plus ), 2 ) *
+    //                     pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
+    //
+    // float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  } else {
+    file << "," ;
+  }
+}
+
 void PBl3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
@@ -173,10 +208,10 @@ void PBl3D( const float kernel_width, const int dimension,
     float tc_plus  = glm::length( intersect.exit_point - c );
 
     vec3 midpoint  = ( intersect.entry_point + intersect.exit_point ) / 2.0f;
-    float distance = glm::length( centre - midpoint );
+    float distance = glm::length( a - midpoint );
 
-    float ta_minus = t_a - distance;
-    float ta_plus  = t_a + distance;
+    float ta_minus = fmax( t_a - kernel_width, distance - kernel_width );
+    float ta_plus  = fmin( t_a + kernel_width, distance + kernel_width );
 
     float expectation = pow( kernel_width, -dimension ) *
                         TrPrime( ta_minus, ta_plus ) *
@@ -184,8 +219,9 @@ void PBl3D( const float kernel_width, const int dimension,
 
     float variance    = pow( kernel_width, -dimension * 2 ) *
                         ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
-                        TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
-                        ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
+                        pow( TrPrime( tc_minus, tc_plus ), 2 ) ) -
+                        ( pow( TrPrime( ta_minus, ta_plus ), 2 ) *
+                        pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
 
     float nsd         = sqrtf( variance ) / expectation;
 
@@ -291,11 +327,11 @@ void SetUpAnalysis( vec3& a, vec3& c, vec3& omega_a, vec3& omega_c,
                     float& t_a, float& t_c ){
 
   vec3 view_point    = vec3( 0, 0, 0 );
-  vec3 closest_point = vec3( view_point.x + ( 0.25 * mfp ),
+  vec3 closest_point = vec3( view_point.x + ( 0.0 * mfp ),
                              view_point.y,
                              view_point.z + ( 10 * mfp )
                            );
-  vec3 beam_origin   = vec3( closest_point.x + ( 0.25 * mfp ),
+  vec3 beam_origin   = vec3( closest_point.x + ( 0.0 * mfp ),
                              closest_point.y - ( 5 * mfp ),
                              closest_point.z
                            );
