@@ -52,7 +52,11 @@ void PBl3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
-void BlP2D( const float kernel_width, const int dimension,
+void BlP3D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
+void BlBs1D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
@@ -75,38 +79,64 @@ void RunAnalysis(){
     BsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     PBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBl1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
-    // BlP2D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    BlBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    // BlP3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     myfile << "\n";
   }
   myfile.close();
 }
 
-void BlP2D( const float kernel_width, const int dimension,
+void BlP3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file ){
-  BasicIntersection intersect;
+  BasicIntersection intersect1;
   vec3 point         = c + ( t_c * omega_c );
-  vec3 closest_point = a + ( t_a * omega_a );
-  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
-    float tc_minus  = glm::length( point - intersect.entry_point );
-    // vec3 vab        = closest_point - point;
-    // float cos_theta = glm::dot( vab, omega_c ) /
-    //                   ( glm::length( vab ) * glm::length( omega_c ) );
-    // float distance  = cos_theta * glm::length( vab );
-    float tc_plus   = glm::length( point - intersect.exit_point );
+  BasicIntersection intersect2;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect1 ) &&
+      SphereIntersection( a, omega_a, kernel_width, point, intersect2 ) ){
+    float ta_minus    = glm::length( a - intersect2.entry_point );
+    float ta_plus     = glm::length( a - intersect2.exit_point );
+
+    float tc_minus    = t_c - kernel_width;
+    float tc_plus     = t_c + kernel_width;
+
 
     // NOTE: does not include the phase
     float expectation = pow( kernel_width, -dimension ) *
-                        Tr( t_a ) * TrPrime( tc_minus, tc_plus );
+                        TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus );
     float variance    = pow( kernel_width, -dimension * 2 ) *
-                        ( ( pow( Tr( t_a ), 2 ) *
+                        ( ( pow( TrPrime( ta_minus, ta_plus ), 2 ) *
                         ( TrPrime( tc_minus, tc_plus ) / analysis_extinction ) ) -
-                        ( pow( Tr( t_a ), 2 ) * pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
+                        ( pow( TrPrime( ta_minus, ta_plus ), 2 ) * pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
 
     float nsd         = sqrtf( variance ) / expectation;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
+  }
+}
+
+void BlBs1D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        Tr( t_a ) * Tr( t_c );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( pow( Tr( t_a ), 2 ) * Tr( t_c ) ) -
+                        ( pow( Tr( t_a ), 2 ) * pow( Tr( t_c ), 2 ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -127,6 +157,8 @@ void BsBl1D( const float kernel_width, const int dimension,
     float nsd         = sqrtf( variance ) / expectation;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -134,67 +166,33 @@ void PBl3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file ){
-  vec3 centre_a  = a + ( t_a * omega_a );
-  vec3 centre_c  = c + ( t_c * omega_c );
-  float distance = glm::length( centre_a - centre_c );
-  float nsd = 0;
-  if( distance <= ( 2 * kernel_width ) ){
-    vec3 dir_ca = centre_a - centre_c;
-    BasicIntersection intersect_a;
-    SphereIntersection( centre_c, dir_ca, kernel_width, centre_a, intersect_a );
-    vec3 dir_ac = centre_c - centre_a;
-    BasicIntersection intersect_c;
-    SphereIntersection( centre_a, dir_ac, kernel_width, centre_c, intersect_c );
-    float cos_theta_ca = glm::dot( glm::normalize( dir_ca ), omega_c );
-    float cos_theta_ac = glm::dot( glm::normalize( dir_ac ), omega_a );
-    if( distance >= kernel_width ){
-      vec3 p1 = intersect_a.entry_point;
-      vec3 p3 = intersect_c.entry_point;
+  BasicIntersection intersect;
+  vec3 centre = a + ( t_a * omega_a );
+  if( SphereIntersection( c, omega_c, kernel_width, centre, intersect ) ){
+    float tc_minus = glm::length( intersect.entry_point - c );
+    float tc_plus  = glm::length( intersect.exit_point - c );
 
-      float tc_minus     = t_c + ( glm::length( centre_c - p1 ) * cos_theta_ca );
-      float tc_plus      = t_c + ( glm::length( centre_c - p3 ) * cos_theta_ca );
-      float ta_minus     = t_a + ( glm::length( centre_a - p3 ) * cos_theta_ac );
-      float ta_plus      = t_a + ( glm::length( centre_a - p1 ) * cos_theta_ac );
+    vec3 midpoint  = ( intersect.entry_point + intersect.exit_point ) / 2.0f;
+    float distance = glm::length( centre - midpoint );
 
-      float expectation = pow( kernel_width, -dimension ) *
-                          TrPrime( ta_minus, ta_plus ) *
-                          TrPrime( tc_minus, tc_plus );
+    float ta_minus = t_a - distance;
+    float ta_plus  = t_a + distance;
 
-      float variance    = pow( kernel_width, -dimension * 2 ) *
-                          ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
-                          TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
-                          ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
+    float expectation = pow( kernel_width, -dimension ) *
+                        TrPrime( ta_minus, ta_plus ) *
+                        TrPrime( tc_minus, tc_plus );
 
-      nsd         = sqrtf( variance ) / expectation;
-    } else {
-      vec3 p1 = a + ( glm::normalize( dir_ac ) * kernel_width );
-      vec3 p3 = c + ( glm::normalize( dir_ca ) * kernel_width );
-      cout << kernel_width << endl;
-      cout << a.x << "," << a.y << "," << a.z << endl;
-      cout << dir_ac.x << "," << dir_ac.y << "," << dir_ac.z << endl;
-      cout << p1.x << "," << p1.y << "," << p1.z << endl;
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
+                        TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
+                        ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
 
-      float tc_minus     = t_c - ( glm::length( centre_c - p1 ) * cos_theta_ca );
-      float tc_plus      = t_c + ( glm::length( centre_c - p3 ) * cos_theta_ca );
-      float ta_minus     = t_a - ( glm::length( centre_a - p3 ) * cos_theta_ac );
-      float ta_plus      = t_a + ( glm::length( centre_a - p1 ) * cos_theta_ac );
+    float nsd         = sqrtf( variance ) / expectation;
 
-      // cout << tc_minus << endl;
-      // cout << tc_plus << endl;
-
-      float expectation = pow( kernel_width, -dimension ) *
-                          TrPrime( ta_minus, ta_plus ) *
-                          TrPrime( tc_minus, tc_plus );
-
-      float variance    = pow( kernel_width, -dimension * 2 ) *
-                          ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
-                          TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
-                          ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
-
-      nsd         = sqrtf( variance ) / expectation;
-    }
+    file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
-  file << "," << to_string( nsd );
 }
 
 void BsBl2D2( const float kernel_width, const int dimension,
@@ -220,6 +218,8 @@ void BsBl2D2( const float kernel_width, const int dimension,
     float nsd         = sqrtf( variance ) / expectation;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -240,6 +240,8 @@ void BsBs1D( const float kernel_width, const int dimension,
     float nsd         = sqrtf( variance ) / expectation;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -253,6 +255,8 @@ void BlBl2D1( const float kernel_width, const int dimension,
     float nsd         = 0;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -278,6 +282,8 @@ void BsBs2D1( const float kernel_width, const int dimension,
     float nsd         = sqrtf( variance ) / expectation;
 
     file << "," << to_string( nsd );
+  } else {
+    file << "," ;
   }
 }
 
@@ -285,11 +291,11 @@ void SetUpAnalysis( vec3& a, vec3& c, vec3& omega_a, vec3& omega_c,
                     float& t_a, float& t_c ){
 
   vec3 view_point    = vec3( 0, 0, 0 );
-  vec3 closest_point = vec3( view_point.x + ( 0.0 * mfp ),
+  vec3 closest_point = vec3( view_point.x + ( 0.25 * mfp ),
                              view_point.y,
                              view_point.z + ( 10 * mfp )
                            );
-  vec3 beam_origin   = vec3( closest_point.x + ( 0.0 * mfp ),
+  vec3 beam_origin   = vec3( closest_point.x + ( 0.25 * mfp ),
                              closest_point.y - ( 5 * mfp ),
                              closest_point.z
                            );
