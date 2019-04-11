@@ -40,11 +40,19 @@ void BsBs1D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
+void BsBl1D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
 void BlBl2D1( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
 void PBl3D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file );
+void BlP2D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file );
@@ -61,41 +69,132 @@ void RunAnalysis(){
   float delta_width = 0.02 * mfp;
 
   for( float kernel_width = delta_width; kernel_width < ( 5 * mfp ); kernel_width = kernel_width + delta_width ){
-    myfile << kernel_width;
+    myfile << ( kernel_width / mfp );
     BsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     BsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     PBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    BsBl1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
+    // BlP2D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, myfile );
     myfile << "\n";
   }
   myfile.close();
+}
+
+void BlP2D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  vec3 point         = c + ( t_c * omega_c );
+  vec3 closest_point = a + ( t_a * omega_a );
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+    float tc_minus  = glm::length( point - intersect.entry_point );
+    // vec3 vab        = closest_point - point;
+    // float cos_theta = glm::dot( vab, omega_c ) /
+    //                   ( glm::length( vab ) * glm::length( omega_c ) );
+    // float distance  = cos_theta * glm::length( vab );
+    float tc_plus   = glm::length( point - intersect.exit_point );
+
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        Tr( t_a ) * TrPrime( tc_minus, tc_plus );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( pow( Tr( t_a ), 2 ) *
+                        ( TrPrime( tc_minus, tc_plus ) / analysis_extinction ) ) -
+                        ( pow( Tr( t_a ), 2 ) * pow( TrPrime( tc_minus, tc_plus ), 2 ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  }
+}
+
+void BsBl1D( const float kernel_width, const int dimension,
+            const vec3 a, const vec3 omega_a, const float t_a,
+            const vec3 c, const vec3 omega_c, const float t_c,
+            std::ofstream& file ){
+  BasicIntersection intersect;
+  if( CylinderIntersection( a, omega_a, c, omega_c, kernel_width, intersect ) ){
+
+    // NOTE: does not include the phase
+    float expectation = pow( kernel_width, -dimension ) *
+                        Tr( t_a ) * Tr( t_c );
+    float variance    = pow( kernel_width, -dimension * 2 ) *
+                        ( ( Tr( t_a ) * pow( Tr( t_c ), 2 ) ) -
+                        ( pow( Tr( t_a ), 2 ) * pow( Tr( t_c ), 2 ) ) );
+
+    float nsd         = sqrtf( variance ) / expectation;
+
+    file << "," << to_string( nsd );
+  }
 }
 
 void PBl3D( const float kernel_width, const int dimension,
             const vec3 a, const vec3 omega_a, const float t_a,
             const vec3 c, const vec3 omega_c, const float t_c,
             std::ofstream& file ){
-  BasicIntersection intersect;
-  vec3 centre = a + ( t_a * omega_a );
-  if( SphereIntersection( c, omega_c, kernel_width, centre, intersect ) ){
-    float tc_minus = glm::length( intersect.entry_point - c );
-    float tc_plus  = glm::length( intersect.exit_point - c );
-    float ta_minus = glm::length( centre - a ) - kernel_width;
-    float ta_plus  = glm::length( centre - a ) + kernel_width;
+  vec3 centre_a  = a + ( t_a * omega_a );
+  vec3 centre_c  = c + ( t_c * omega_c );
+  float distance = glm::length( centre_a - centre_c );
+  float nsd = 0;
+  if( distance <= ( 2 * kernel_width ) ){
+    vec3 dir_ca = centre_a - centre_c;
+    BasicIntersection intersect_a;
+    SphereIntersection( centre_c, dir_ca, kernel_width, centre_a, intersect_a );
+    vec3 dir_ac = centre_c - centre_a;
+    BasicIntersection intersect_c;
+    SphereIntersection( centre_a, dir_ac, kernel_width, centre_c, intersect_c );
+    float cos_theta_ca = glm::dot( glm::normalize( dir_ca ), omega_c );
+    float cos_theta_ac = glm::dot( glm::normalize( dir_ac ), omega_a );
+    if( distance >= kernel_width ){
+      vec3 p1 = intersect_a.entry_point;
+      vec3 p3 = intersect_c.entry_point;
 
-    float expectation = pow( kernel_width, -dimension ) *
-                        TrPrime( ta_minus, ta_plus ) *
-                        TrPrime( tc_minus, tc_plus );
+      float tc_minus     = t_c + ( glm::length( centre_c - p1 ) * cos_theta_ca );
+      float tc_plus      = t_c + ( glm::length( centre_c - p3 ) * cos_theta_ca );
+      float ta_minus     = t_a + ( glm::length( centre_a - p3 ) * cos_theta_ac );
+      float ta_plus      = t_a + ( glm::length( centre_a - p1 ) * cos_theta_ac );
 
-    float variance    = pow( kernel_width, -dimension * 2 ) *
-                        ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
-                        TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
-                        ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
+      float expectation = pow( kernel_width, -dimension ) *
+                          TrPrime( ta_minus, ta_plus ) *
+                          TrPrime( tc_minus, tc_plus );
 
-    float nsd         = sqrtf( variance ) / expectation;
+      float variance    = pow( kernel_width, -dimension * 2 ) *
+                          ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
+                          TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
+                          ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
 
-    file << "," << to_string( nsd );
+      nsd         = sqrtf( variance ) / expectation;
+    } else {
+      vec3 p1 = a + ( glm::normalize( dir_ac ) * kernel_width );
+      vec3 p3 = c + ( glm::normalize( dir_ca ) * kernel_width );
+      cout << kernel_width << endl;
+      cout << a.x << "," << a.y << "," << a.z << endl;
+      cout << dir_ac.x << "," << dir_ac.y << "," << dir_ac.z << endl;
+      cout << p1.x << "," << p1.y << "," << p1.z << endl;
+
+      float tc_minus     = t_c - ( glm::length( centre_c - p1 ) * cos_theta_ca );
+      float tc_plus      = t_c + ( glm::length( centre_c - p3 ) * cos_theta_ca );
+      float ta_minus     = t_a - ( glm::length( centre_a - p3 ) * cos_theta_ac );
+      float ta_plus      = t_a + ( glm::length( centre_a - p1 ) * cos_theta_ac );
+
+      // cout << tc_minus << endl;
+      // cout << tc_plus << endl;
+
+      float expectation = pow( kernel_width, -dimension ) *
+                          TrPrime( ta_minus, ta_plus ) *
+                          TrPrime( tc_minus, tc_plus );
+
+      float variance    = pow( kernel_width, -dimension * 2 ) *
+                          ( ( ( TrPrime( ta_minus, ta_plus ) / analysis_extinction ) *
+                          TrPrime( tc_minus, tc_plus ) / analysis_extinction ) -
+                          ( TrPrime( ta_minus, ta_plus ) * TrPrime( tc_minus, tc_plus ) ) );
+
+      nsd         = sqrtf( variance ) / expectation;
+    }
   }
+  file << "," << to_string( nsd );
 }
 
 void BsBl2D2( const float kernel_width, const int dimension,
