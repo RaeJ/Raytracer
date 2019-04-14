@@ -542,13 +542,17 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    float diff;
    float scattered  = uniform( generator );
-   if( scattered <= ( scattering_c / extinction_c ) ){
+   // if( scattered <= ( scattering_c / extinction_c ) ){
+   if( scattered <= 0.8 ){
      // TODO: check distance is correct
-     float tmp_t_s     = -( 1 - ( uniform( generator ) ) / extinction_c );
+     float tmp_t_s     = -( log( 1 - uniform( generator ) ) ); // Note: should be divided by extinction
+     //TODO: ask Carl what to do
      while( ( tmp_t_s > t_s ) || ( tmp_t_s < 0 ) ){
-       tmp_t_s     = -( 1 - ( uniform( generator ) ) / extinction_c );
+       tmp_t_s     = -( log( 1 - uniform( generator ) ) );
+       // SOME HITS ARE VERY CLOSE BY: WORK OUT WHAT TO DO!!
      }
      t_s               = tmp_t_s;
+     cout << t_s << endl;
      vec4 start        = origin + ( t_s * glm::normalize( direction ) );
      start.w           = 1;
      float the         = 2 * PI * uniform( generator );

@@ -6,11 +6,11 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 50
+#define PHOTON_NUMBER 10
 #define BOUNCES 0
 #define ADAPTIVE false
 
-#define SHORT_BEAMS true
+#define SHORT_BEAMS false
 
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
