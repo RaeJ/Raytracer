@@ -542,37 +542,32 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    float diff;
    float scattered  = uniform( generator );
-   // if( scattered <= ( scattering_c / extinction_c ) ){
-   if( scattered <= 0.8 ){
+   if( scattered <= ( scattering_c / extinction_c ) ){
      // TODO: check distance is correct
-     float tmp_t_s     = -( log( 1 - uniform( generator ) ) ); // Note: should be divided by extinction
-     //TODO: ask Carl what to do
-     while( ( tmp_t_s > t_s ) || ( tmp_t_s < 0 ) ){
-       tmp_t_s     = -( log( 1 - uniform( generator ) ) );
-       // SOME HITS ARE VERY CLOSE BY: WORK OUT WHAT TO DO!!
-     }
-     t_s               = tmp_t_s;
-     cout << t_s << endl;
-     vec4 start        = origin + ( t_s * glm::normalize( direction ) );
-     start.w           = 1;
-     float the         = 2 * PI * uniform( generator );
-     float phi         = acos(1 - 2 * uniform( generator ) );
-     float x           = sin( phi ) * cos( the );
-     float y           = sin( phi ) * sin( the );
-     float z           = cos( phi );
-     vec3 dir          = glm::normalize( vec3( x, y, z ) );
-     vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
-     float transmitted = Transmittance( t_s, extinction_c );
-     vec3 new_energy   = energy * transmitted;
+     float tmp_t_s     = -( log( 1 - uniform( generator ) ) / extinction_c );
+     if( ( tmp_t_s < t_s ) && ( tmp_t_s > 0 ) ){
+       t_s               = tmp_t_s;
+       vec4 start        = origin + ( t_s * glm::normalize( direction ) );
+       start.w           = 1;
+       float the         = 2 * PI * uniform( generator );
+       float phi         = acos(1 - 2 * uniform( generator ) );
+       float x           = sin( phi ) * cos( the );
+       float y           = sin( phi ) * sin( the );
+       float z           = cos( phi );
+       vec3 dir          = glm::normalize( vec3( x, y, z ) );
+       vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
+       float transmitted = Transmittance( t_s, extinction_c );
+       vec3 new_energy   = energy * transmitted;
 
-     PhotonBeam scattered;
-     scattered.ada_width = false;
-     CastBeam( bounce, new_energy, start, dir_sample,
-               min_point, max_point, beams,
-               radius, triangles, matrix, scattered );
+       PhotonBeam scattered;
+       scattered.ada_width = false;
+       CastBeam( bounce, new_energy, start, dir_sample,
+                 min_point, max_point, beams,
+                 radius, triangles, matrix, scattered );
 
-     if( SHORT_BEAMS ){
-       scatt = true;
+       if( SHORT_BEAMS ){
+         scatt = true;
+       }
      }
    }
 

@@ -6,11 +6,14 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 10
+#define PHOTON_NUMBER 2500
 #define BOUNCES 0
 #define ADAPTIVE false
 
 #define SHORT_BEAMS false
+#define SHORT_VIEW false
+
+#define ONE_DIMENSIONAL true
 
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
@@ -28,7 +31,7 @@ using glm::vec4;
 using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.2,1);
-vec3 light_power = 0.0001f * vec3( 1, 1, 1 );
+vec3 light_power = 0.0005f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
