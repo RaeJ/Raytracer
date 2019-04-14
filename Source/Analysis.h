@@ -86,18 +86,18 @@ void RunAnalysis(){
   double t_a, t_c;
   SetUpAnalysis( a, c, omega_a, omega_c, t_a, t_c );
 
-  double maximum_width = 5 * mfp;
+  double maximum_width = min( t_a, t_c );
   double delta_width   = 0.02 * mfp;
 
   for( double kernel_width = delta_width; kernel_width < maximum_width; kernel_width = kernel_width + delta_width ){
     nsd << ( kernel_width / mfp );
     BsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
-    BsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
+    BsBs1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, nsd );
     BsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
-    PBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
-    BsBl1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
-    BlBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
-    BlP3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
+    PBl3D( kernel_width, 3, a, omega_a, t_a, c, omega_c, t_c, nsd );
+    BsBl1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, nsd );
+    BlBs1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, nsd );
+    BlP3D( kernel_width, 3, a, omega_a, t_a, c, omega_c, t_c, nsd );
     PBs2D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, nsd );
     nsd << "\n";
   }
@@ -109,12 +109,12 @@ void RunAnalysis(){
   for( double kernel_width = 1.0e-6 * mfp ; kernel_width < maximum_width; kernel_width = kernel_width * 1.05 ){
     rrmse << ( kernel_width / mfp );
     rBsBs2D1( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
-    // rBsBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
+    // rBsBs1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, rrmse );
     // rBsBl2D2( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
-    // rPBl3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
-    rBsBl1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
-    // rBlBs1D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
-    rBlP3D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
+    // rPBl3D( kernel_width, 3, a, omega_a, t_a, c, omega_c, t_c, rrmse );
+    rBsBl1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, rrmse );
+    // rBlBs1D( kernel_width, 1, a, omega_a, t_a, c, omega_c, t_c, rrmse );
+    rBlP3D( kernel_width, 3, a, omega_a, t_a, c, omega_c, t_c, rrmse );
     // rPBs2D( kernel_width, 2, a, omega_a, t_a, c, omega_c, t_c, rrmse );
     rrmse << "\n";
   }
@@ -500,12 +500,12 @@ bool SphereIntersection( const glm::dvec3 p, const glm::dvec3 dir,
     }
     else if ( glm::length( vpc ) == kernel_width ){
       intersection.entry_point = p;
-      intersection.exit_point  = p;
+      intersection.exit_point  = p + ( 2 * kernel_width * dir );
     } else {
       double dist = sqrt( pow( kernel_width, 2 ) - pow( glm::length( pc - centre ), 2 ) );
       double di1  = dist - glm::length( pc - p );
-      intersection.entry_point = p;
       intersection.exit_point  = p + ( dir * di1 );
+      intersection.entry_point = p + ( dir * di1 ) - ( dir * ( kernel_width * 2 ) );
     }
   } else{
     if( glm::length( centre - pc ) > kernel_width ){

@@ -60,7 +60,8 @@ vector<PhotonSeg> segments;
 unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 generator (seed);
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
-// std::uniform_real_distribution<double> uniform_small(0.05, 0.1);
+std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
+std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
 std::uniform_real_distribution<double> uniform_small(0.02, 0.06);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
 
@@ -81,7 +82,6 @@ void CastBeam( int bounce,
                vec4& min_point,
                vec4& max_point,
                vector<PhotonBeam>& beams,
-               float offset,
                float radius,
                const vector<Triangle>& triangles,
                const mat4& matrix,
@@ -92,7 +92,7 @@ bool intersectPlane( const vec3& n,
                     const vec3& l0,
                     const vec3& l,
                     float& t ) ;
-float Transmittance( float length, float ext );
+double Transmittance( double length, double ext );
 
 // -------------------------------------------------------------------------- //
 // DRAWING FUNCTIONS
@@ -339,7 +339,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float cos_x  = glm::dot( abs( dir ), x_dir );
    float cos_y  = glm::dot( abs( dir ), y_dir );
 
-   float step   = 0.02;
+   float step   = length;//0.02;
 
    if( b.ada_width ){
      step = length;
@@ -456,7 +456,6 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     vec4 direction = FindDirection( origin, centre, radius );
     direction = glm::normalize( direction );
     beam.ada_width = ADAPTIVE;
-    float offset = uniform_small( generator ) * 0.1;
     float r      = uniform_small( generator );
     float r_small= uniform_small( generator );
     vec3 w_u     = glm::normalize( vec3( direction.x + r_small,
@@ -465,11 +464,32 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     vec3 w_v     = glm::normalize( vec3( direction.x,
                                          direction.y,
                                          direction.z - r_small ) );
+    if( FIXED_RADIUS ){
+      r          = RADIUS;
+      w_u        = glm::normalize( vec3( direction.x + r,
+                                         direction.y,
+                                         direction.z ) );
+      w_v        = glm::normalize( vec3( direction.x,
+                                         direction.y,
+                                         direction.z - r ) );
+    }
+
     beam.omega_u = vec4( w_u, 1.0f );
     beam.omega_v = vec4( w_v, 1.0f );
 
-    CastBeam( 0, energy, origin, direction, min_point, max_point,
-              beams, offset, r, triangles, matrix, beam );
+    float t        = 2* PI * uniform_radius( generator );
+    float u        = uniform_radius( generator ) + uniform_radius( generator );
+    float w_width;
+    if( u > 1 ) w_width = 2 - u; else w_width = u;
+    float x_offset = w_width*cos(t);
+    float y_offset = uniform_offset( generator );
+    float z_offset = w_width*sin(t);
+    vec4 displace  = vec4( x_offset, y_offset, z_offset, 0 );
+
+    vec4 start     = origin + displace;
+
+    CastBeam( 0, energy, start, direction, min_point, max_point,
+              beams, r, triangles, matrix, beam );
   }
 
   // for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
@@ -510,21 +530,63 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l
 
 void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
                vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams,
-               float offset, float radius, const vector<Triangle>& triangles,
+               float radius, const vector<Triangle>& triangles,
                const mat4& matrix, PhotonBeam& beam ){
+   bool scatt = false;
 
    Intersection hit;
+   float t_s;
+   if( ClosestIntersection( origin, direction, hit, matrix, triangles ) ){
+     t_s = glm::length( vec3( hit.position ) - vec3( origin ) );
+   }
+
    float diff;
+   float scattered  = uniform( generator );
+   if( scattered <= ( scattering_c / extinction_c ) ){
+     // TODO: check distance is correct
+     float tmp_t_s     = -( 1 - ( uniform( generator ) ) / extinction_c );
+     while( ( tmp_t_s > t_s ) || ( tmp_t_s < 0 ) ){
+       tmp_t_s     = -( 1 - ( uniform( generator ) ) / extinction_c );
+     }
+     t_s               = tmp_t_s;
+     vec4 start        = origin + ( t_s * glm::normalize( direction ) );
+     start.w           = 1;
+     float the         = 2 * PI * uniform( generator );
+     float phi         = acos(1 - 2 * uniform( generator ) );
+     float x           = sin( phi ) * cos( the );
+     float y           = sin( phi ) * sin( the );
+     float z           = cos( phi );
+     vec3 dir          = glm::normalize( vec3( x, y, z ) );
+     vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
+     float transmitted = Transmittance( t_s, extinction_c );
+     vec3 new_energy   = energy * transmitted;
+
+     PhotonBeam scattered;
+     scattered.ada_width = false;
+     CastBeam( bounce, new_energy, start, dir_sample,
+               min_point, max_point, beams,
+               radius, triangles, matrix, scattered );
+
+     if( SHORT_BEAMS ){
+       scatt = true;
+     }
+   }
+
    if( ClosestIntersection( origin, direction, hit, matrix, triangles ) ){
      // PhotonBeam beam;
      // TODO: Work out why the offset is not working as expected
-     beam.offset    = offset;
+     // beam.offset    = offset;
      beam.radius    = radius;
      beam.energy    = energy;
      beam.index_hit = hit.index;
 
-     beam.start     = origin + beam.offset;
-     beam.end       = hit.position;
+     beam.start     = origin;// + beam.offset;
+     if( scatt ){
+       beam.end     = origin + ( t_s * direction );
+       beam.end.w   = 1.0f;
+     } else {
+       beam.end     = hit.position;
+     }
 
      float absorbed = uniform( generator );
      if( absorbed < ABSORBED ){
@@ -544,7 +606,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
      diff        = glm::length( vec3( hit.position - origin ) );
 
-     if( ( bounce < BOUNCES ) && ( !beam.absorbed ) ){
+     if( ( bounce < BOUNCES ) && ( !beam.absorbed ) && ( !scatt ) ){
        // float rand            =  dis( gen ) * 0.01;
        int num               = bounce + 1;
        Triangle hit_triangle = triangles[hit.index];
@@ -558,7 +620,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        PhotonBeam bounced;
        bounced.ada_width = false;
        CastBeam( num, new_energy, hit.position, reflected,
-                 min_point, max_point, beams, 0.0f, radius,
+                 min_point, max_point, beams, radius,
                  triangles, matrix, bounced );
      } else if( ABSORBED > 0 ) {
        beam.absorbed= true;
@@ -591,10 +653,10 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      float t;
      // PhotonBeam beam;
      beam.absorbed  = false;
-     beam.offset    = offset;
+     // beam.offset    = offset;
      beam.radius    = radius;
      beam.energy    = energy;
-     beam.start     = origin + beam.offset;
+     beam.start     = origin;// + beam.offset;
      beam.index_hit = -1;
 
      float t_min = m;
@@ -618,7 +680,14 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        cout << "No intersection found" << endl;
        return;
      }
-     beam.end       = vec4( start + ( t_min * dir ), 1.0f );
+
+     if( scatt ){
+       beam.end     = origin + ( t_s * direction );
+       beam.end.w   = 1.0f;
+     } else {
+       beam.end       = vec4( start + ( t_min * dir ), 1.0f );
+     }
+
      beams.push_back( beam );
 
      diff        = glm::length( vec3( beam.end - beam.start ) );
@@ -631,27 +700,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      min_point.z = fmax( beam.end.z, fmax( beam.start.z, min_point.z ) );
    }
 
-   float scattered  = uniform( generator );
-   if( scattered <= ( scattering_c / extinction_c ) ){
-     // TODO: check distance is correct
-     float t_s         = -( ( 1 - uniform( generator ) ) / extinction_c );
-     vec4 start        = origin + ( t_s * ( hit.position - origin ) );
-     float the         = 2 * PI * uniform( generator );
-     float phi         = acos(1 - 2 * uniform( generator ) );
-     float x           = sin( phi ) * cos( the );
-     float y           = sin( phi ) * sin( the );
-     float z           = cos( phi );
-     vec3 dir          = glm::normalize( vec3( x, y, z ) );
-     vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
-     float transmitted = Transmittance( t_s, extinction_c );
-     vec3 new_energy   = energy * transmitted;
 
-     PhotonBeam scattered;
-     scattered.ada_width = false;
-     CastBeam( bounce, new_energy, start, dir_sample,
-               min_point, max_point, beams, 0.0f,
-               radius, triangles, matrix, scattered );
-   }
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
@@ -667,8 +716,8 @@ vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
   return( position - origin );
 }
 
-float Transmittance( float length, float ext ){
-  float power     = - ext * length;
+double Transmittance( double length, double ext ){
+  double power     = - ext * length;
   return exp( power );
 }
 

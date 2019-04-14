@@ -6,12 +6,17 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 500
+#define PHOTON_NUMBER 50
 #define BOUNCES 0
 #define ADAPTIVE false
 
-#define RUN_ANALYSIS true
+#define SHORT_BEAMS true
+
+#define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
+
+#define FIXED_RADIUS false
+#define RADIUS 0.05f
 
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.00f
@@ -22,8 +27,8 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-vec4 light_position(0,-0.98,-0.2,1);
-vec3 light_power = 0.001f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.8,-0.2,1);
+vec3 light_power = 0.0001f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
