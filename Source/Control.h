@@ -6,7 +6,7 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 2500
+#define PHOTON_NUMBER 4000
 #define BOUNCES 0
 #define ADAPTIVE false
 
@@ -18,11 +18,14 @@
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
 
-#define FIXED_RADIUS false
-#define RADIUS 0.05f
+#define FIXED_RADIUS true
+#define RADIUS 0.03f
 
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.00f
+
+#define SEED 42
+// #define SEED std::chrono::system_clock::now().time_since_epoch().count()
 
 using namespace std;
 using glm::vec3;
@@ -30,12 +33,13 @@ using glm::mat3;
 using glm::vec4;
 using glm::mat4;
 
-vec4 light_position(0,-0.8,-0.2,1);
-vec3 light_power = 0.0005f * vec3( 1, 1, 1 );
+vec4 light_position(0,-0.95,-0.2,1);
+// vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
+vec3 light_power = 0.02f * vec3( 1, 1, 1 );
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
-float scattering_c = 0.005;
+float scattering_c = 0.05;
 float extinction_c = absorption_c + scattering_c;
 
 vec4 camera(0, 0, -3, 1.0);

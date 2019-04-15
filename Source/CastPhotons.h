@@ -20,7 +20,7 @@ struct PhotonBeam
   bool ada_width;
   float offset;
   float radius;
-  vec3 energy;
+  glm::dvec3 energy;
   int index_hit;
   bool absorbed;
 };
@@ -57,13 +57,14 @@ struct Node* newNode( AABB data )
 
 vector<PhotonSeg> segments;
 
-unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-std::mt19937 generator (seed);
+std::mt19937 generator ( SEED );
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
 std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
 std::uniform_real_distribution<double> uniform_small(0.02, 0.06);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
+std::normal_distribution<double> normal(0.0, 1);
+
 
 // -------------------------------------------------------------------------- //
 // FUNCTIONS
@@ -443,7 +444,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
 
   vec4 origin    = matrix * light_position;
   // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  vec4 centre    = vec4( origin.x, origin.y + 1.5, origin.z, 1.0f );
+  vec4 centre    = vec4( origin.x, origin.y + 0.8, origin.z, 1.0f );
   // TODO: make this radius value useful
   float radius   = 0.05f;
 
@@ -482,7 +483,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     float w_width;
     if( u > 1 ) w_width = 2 - u; else w_width = u;
     float x_offset = w_width*cos(t);
-    float y_offset = uniform_offset( generator );
+    float y_offset = uniform_offset( generator ) * 0.1;
     float z_offset = w_width*sin(t);
     vec4 displace  = vec4( x_offset, y_offset, z_offset, 0 );
 
@@ -703,6 +704,8 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 }
 
 vec4 FindDirection( vec4 origin, vec4 centre, float radius ){
+  // float r1  = normal( generator );
+  // float r2  = normal( generator );
   float r1  = uniform( generator );
   float r2  = uniform( generator );
   float the = 2 * PI * r1;
