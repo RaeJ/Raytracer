@@ -230,9 +230,10 @@ double Integral_721_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 
   for( double tc=i.tc_minus; tc<i.tc_plus; tc = tc + dt_c ){
     double tb  = i.tb_minus - ( abs( cos_theta ) * ( tc - i.tc_minus ) );
     double current_r   = ( s.radius / length_const ) * tb;
+    // current_r = fmax( current_r, s.radius );
     double constant = Transmittance( tb, extinction );
     double transmitted = Transmittance( tc, extinction ) * constant
-                        * ( scattering_c / pow( current_r, 2 ) );
+                        * ( scattering_c / pow( current_r, 2 ) ) * dt_c;
     // if( transmitted > 1e-6 ){
     integrand += transmitted;
     // }
@@ -240,23 +241,25 @@ double Integral_721_ada( PhotonSeg s, CylIntersection i, float extinction, vec4 
   return integrand;
 }
 
-// TODO: Work out why it works for analytical but not integrated
 double Integral_721( PhotonSeg s, CylIntersection i, float extinction, vec4 dir ){
   vec3 beam_dir        = glm::normalize( vec3( s.end ) - vec3( s.start ) );
   vec3 camera_dir      = glm::normalize( vec3( dir ) );
   float cos_theta      = glm::dot( beam_dir, -camera_dir );
 
+  // integral version
+
   // double integrand = 0;
-  // double dt_c      = 0.001;
+  // double dt_c      = 0.0001;
 
   // for( double tc=i.tc_minus; tc<i.tc_plus; tc = tc + dt_c ){
   //   double tb  = i.tb_minus - ( abs( cos_theta ) * ( tc - i.tc_minus ) );
   //   double constant = Transmittance( tb, extinction );
-  //   double transmitted = Transmittance( tc, extinction ) * constant;
-  //   // if( transmitted > 1e-6 ){
+  //   double transmitted = Transmittance( tc, extinction ) * constant * dt_c;
   //   integrand += transmitted;
-  //   // }
   // }
+  // return integrand;
+
+  // analytical version
   double numerator = exp( -extinction * ( i.tc_minus - i.tc_plus ) *
                      ( abs( cos_theta ) - 1 ) ) - 1;
   double denominator = exp( extinction * ( i.tc_minus + i.tb_minus ) ) *
@@ -341,46 +344,63 @@ float Integral_722( screen* screen, const vec4 start, const vec4 limit,
 
 double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  ){
   double transmitted= 0;
-  glm::dvec3 x_1    = vec3( s.start );   glm::dvec3 x_3 = i.exit_point;
-  glm::dvec3 x_2    = vec3( s.end );     glm::dvec3 x_4 = i.entry_point;
-  glm::dvec3 a      = glm::normalize( x_2 - x_1 );
-  glm::dvec3 b      = glm::normalize( vec3( dir ) );
-  glm::dvec3 c      = x_1 - x_3;
-  double a_dot_b    = glm::dot( a, b );
-  double b_dot_c    = glm::dot( b, c );
-  double a_dot_c    = glm::dot( a, c );
-  double a_dot_a    = glm::dot( a, a );
-  double b_dot_b    = glm::dot( b, b );
-  double denominator= ( a_dot_a * b_dot_b ) - ( a_dot_b * a_dot_b );
-  // TODO: check distance is less than the radius
+  glm::dvec3 a    = vec3( s.start );   glm::dvec3 c = i.exit_point;
+  glm::dvec3 b    = vec3( s.end );     glm::dvec3 d = i.entry_point;
+  glm::dvec3 ab   = glm::normalize( b - a );
+  glm::dvec3 cd   = glm::normalize( d - c );
 
-  if( a_dot_a != 0 && b_dot_b !=0 && denominator != 0 ){
-    double d          = ( ( -a_dot_b * b_dot_c ) + ( a_dot_c * b_dot_b ) ) / denominator;
-    double e          = ( ( a_dot_b * a_dot_c ) - ( b_dot_c * a_dot_a ) ) / denominator;
-    glm::dvec3 intersect_d = x_1 + ( a * d );
-    glm::dvec3 intersect_e = x_3 + ( e * d );
+  glm::dvec3 ab_cross_cd = glm::cross( ab, cd );
 
-    double t_bc       = glm::length( intersect_d - glm::dvec3( s.orig_start ) );
+  // PQ = a + t*ab - ( c + s*cd ) = a - c + ( t*ab - s*cd )
+  // PQ = k( ab_cross_cd )
+  // k( ab_cross_cd ) = a - c + ( t*ab - s*cd )
 
-    double t_cb       = glm::length( intersect_e );
+  double u_dot_u         = glm::dot( ab, ab );
+  double u_dot_v         = glm::dot( ab, cd );
+  double v_dot_v         = glm::dot( cd, cd );
+  double u_dot_w         = glm::dot( ab, a - c );
+  double v_dot_w         = glm::dot( cd, a - c );
+  double denominator     = glm::dot( u_dot_u, v_dot_v ) -
+                           glm::dot( u_dot_v, u_dot_v );
 
-    // cout << "Beam: " << t_bc << endl;
-    // cout << "Camera: " << t_cb << endl;
-    Vertex v0; v0.position = vec4( intersect_d, 1.0f );
-    Vertex v1; v1.position = vec4( intersect_e, 1.0f );
-    cout << "-------------------------------------------------------" << endl;
-    cout << "( " << intersect_d.x << ", " << intersect_d.y << ", " << intersect_d.z << " )" << endl;
-    cout << "( " << intersect_e.x << ", " << intersect_e.y << ", " << intersect_e.z << " )" << endl;
-    cout << glm::length( intersect_e - intersect_d ) << endl;
+  if( ( denominator != 0 ) && ( u_dot_u != 0 ) && ( v_dot_v != 0 ) ){
+    double t_ab = ( glm::dot( u_dot_v, v_dot_w ) - glm::dot( v_dot_v, u_dot_w ) ) / denominator;
+    double t_cd = ( glm::dot( u_dot_u, v_dot_w ) - glm::dot( u_dot_v, u_dot_w ) ) / denominator;
+    double distance = glm::length( a - c + ( t_ab * ab ) - ( t_cd * cd ) );
 
-    transmitted= Transmittance( t_bc, extinction ) * Transmittance( t_cb, extinction );
+    glm::dvec3 point_beam = a + ( t_ab * ab );
+    glm::dvec3 point_view = c + ( t_cd * cd );
+
+    double view_distance = glm::length( point_view );
+    double beam_distance = glm::length( point_beam - glm::dvec3( s.orig_start ) );
+
+    bool bound1 = false; bool bound2 = false;
+    if( ( view_distance >= glm::length( d ) ) &&
+        ( view_distance <= glm::length( c ) ) ){
+      bound1 = true;
+    }
+    if( ( beam_distance >= glm::length( a - glm::dvec3( s.orig_start ) ) ) &&
+        ( ( beam_distance <= glm::length( b - glm::dvec3( s.orig_start ) ) ) ) ){
+      bound2 = true;
+    }
+
+
+    if( bound1 && bound2 ){
+      double t_bc       = glm::length( point_beam - glm::dvec3( s.orig_start ) );
+      double t_cb       = view_distance;
+      transmitted       = Transmittance( t_bc, extinction ) *
+                          Transmittance( t_cb, extinction );
+
+      double cos_theta  = glm::dot( ab, cd );
+      double sin_theta  = sqrt( 1 - pow( cos_theta, 2 ) );
+
+      return ( transmitted / sin_theta );
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
   }
-
-  double sin_theta  = glm::length( glm::cross( a, b ) );
-
-  // cout << ( transmitted / sin_theta ) << endl;
-
-  return ( transmitted / sin_theta );
 }
 
 

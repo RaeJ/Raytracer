@@ -61,9 +61,10 @@ std::mt19937 generator ( SEED );
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
 std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
-std::uniform_real_distribution<double> uniform_small(0.02, 0.06);
+std::uniform_real_distribution<double> uniform_beam(0.001f * 1/0.04, 0.0015f * 1/0.04);
+std::uniform_real_distribution<double> uniform_small(0.002f * 1/0.04, 0.004f * 1/0.04);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
-std::normal_distribution<double> normal(0.0, 1);
+std::normal_distribution<double> normal(0.0, 0.25);
 
 
 // -------------------------------------------------------------------------- //
@@ -188,10 +189,29 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
-         } else {
-           // TODO: what to do here?
-           parent->segments[i%2] = child[i];
-           // segments.push_back( child[i] );
+         }
+         // else {
+         //   // TODO: what to do here?
+         //   parent->segments[i%2] = child[i];
+         //   // segments.push_back( child[i] );
+         // }
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.z < mid.z ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.z > mid.z ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      } else {
@@ -203,10 +223,30 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
-         } else {
-           // TODO: what to do here?
-           parent->segments[i%2] = child[i];
-           // segments.push_back( child[i] );
+         }
+         // else {
+         //   // TODO: what to do here?
+         //   parent->segments[i%2] = child[i];
+         //   // segments.push_back( child[i] );
+         // }
+
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.y < mid.y ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.y > mid.y ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      }
@@ -220,8 +260,27 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
-         } else {
-           parent->segments[i%2] = child[i];
+         }
+         // else {
+         //   parent->segments[i%2] = child[i];
+         // }
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.z < mid.z ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.z > mid.z ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      } else {
@@ -233,10 +292,29 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
-         } else {
-           // TODO: what to do here?
-           parent->segments[i%2] = child[i];
-           // segments.push_back( child[i] );
+         }
+         // else {
+         //   // TODO: what to do here?
+         //   parent->segments[i%2] = child[i];
+         //   // segments.push_back( child[i] );
+         // }
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.x < mid.x ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.x > mid.x ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      }
@@ -250,8 +328,27 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
-         } else {
-           parent->segments[i%2] = child[i];
+         }
+         // else {
+         //   parent->segments[i%2] = child[i];
+         // }
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.y < mid.y ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.y > mid.y ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      } else {
@@ -263,10 +360,30 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
-         } else {
-           // TODO: what to do here?
-           parent->segments[i%2] = child[i];
-           // segments.push_back( child[i] );
+         }
+         // else {
+         //   // TODO: what to do here?
+         //   parent->segments[i%2] = child[i];
+         //   // segments.push_back( child[i] );
+         // }
+
+       }
+       if( same ){
+         l.clear();
+         r.clear();
+         for( int i=0; i<child.size(); i++ ){
+           PhotonSeg box = child[i];
+           if( box.mid.x < mid.x ){
+             l.push_back( box );
+             same = false;
+           }  else if( box.mid.x > mid.x ){
+             r.push_back( box );
+             same = false;
+           } else {
+             // TODO: what to do here?
+             parent->segments[i%2] = child[i];
+             // segments.push_back( child[i] );
+           }
          }
        }
      }
@@ -334,7 +451,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
    vec3 diff    = vec3( end - start );
    vec3 dir     = glm::normalize( diff );
-   float length = glm::length( end - start );
+   float length = glm::length( vec3( end ) - vec3( start ) );
    float j=0;
 
    float cos_x  = glm::dot( abs( dir ), x_dir );
@@ -355,7 +472,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
 
-     if( next.x > end.x || next.y > end.y || next.z > end.z ){
+     if( next.x >= end.x || next.y >= end.y || next.z >= end.z ){
        j = glm::length( length );
        beam_seg.end = vec4( end.x, end.y, end.z, 1.0f );
      } else {
@@ -443,8 +560,8 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
   vec4 max_point = vec4( -m, -m, m, 1 );
 
   vec4 origin    = matrix * light_position;
-  // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  vec4 centre    = vec4( origin.x, origin.y + 0.8, origin.z, 1.0f );
+  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  // vec4 centre    = vec4( origin.x, origin.y + 1.5, origin.z, 1.0f );
   // TODO: make this radius value useful
   float radius   = 0.05f;
 
@@ -457,7 +574,7 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     vec4 direction = FindDirection( origin, centre, radius );
     direction = glm::normalize( direction );
     beam.ada_width = ADAPTIVE;
-    float r      = uniform_small( generator );
+    float r      = uniform_beam( generator );
     float r_small= uniform_small( generator );
     vec3 w_u     = glm::normalize( vec3( direction.x + r_small,
                                          direction.y,
@@ -493,17 +610,17 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
               beams, r, triangles, matrix, beam );
   }
 
-  // for (double phi = 0.; phi < 2*PI; phi += PI/20.) // Azimuth [0, 2PI]
+  // for (double phi = 0.; phi < 2*PI; phi += PI/13.) // Azimuth [0, 2PI]
   //   {
-  //       for (double theta = 0.; theta < PI; theta += PI/50.) // Elevation [0, PI]
+  //       for (double theta = 0.; theta < PI; theta += PI/13.) // Elevation [0, PI]
   //       {
   //           float x        = cos(phi) * sin(theta);
   //           float y        = sin(phi) * sin(theta);
   //           float z        =            cos(theta);
   //           vec4 direction = glm::normalize( vec4( x, y, z, 1.0f ) );
-  //           float offset   = 0.0f;
-  //           CastBeam( 0, energy, origin, direction, min_point, max_point, beams,
-  //                     offset, 0.02, triangles, matrix, beam );
+  //           beam.ada_width = ADAPTIVE;
+  //           CastBeam( 0, energy, origin, direction, min_point, max_point,
+  //                     beams, RADIUS, triangles, matrix, beam );
   //       }
   //   }
 
@@ -543,7 +660,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
 
    float diff;
    float scattered  = uniform( generator );
-   if( scattered <= ( scattering_c / extinction_c ) ){
+   if( ( scattered <= ( scattering_c / extinction_c ) ) && SCATTER ){
      // TODO: check distance is correct
      float tmp_t_s     = -( log( 1 - uniform( generator ) ) / extinction_c );
      if( ( tmp_t_s < t_s ) && ( tmp_t_s > 0 ) ){
@@ -558,7 +675,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec3 dir          = glm::normalize( vec3( x, y, z ) );
        vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
        float transmitted = Transmittance( t_s, extinction_c );
-       vec3 new_energy   = energy * transmitted;
+       vec3 new_energy   = energy;
 
        PhotonBeam scattered;
        scattered.ada_width = false;
@@ -615,11 +732,14 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        // TODO: Should the below be diffuse instead of specular?
        vec3 refl             = glm::reflect( vec3( incident ), vec3( normal ) );
        vec4 reflected        = vec4( glm::normalize( refl ), 1.0f );
+       vec4 bounce_dir       = FindDirection( hit.position, hit.position + ( reflected * 0.5f ), 0 );
+       vec4 new_direction    = vec4( glm::normalize( vec3( bounce_dir ) ), 1.0f );
+       if( scattered > 0.5 ) new_direction = reflected;
        float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
        PhotonBeam bounced;
        bounced.ada_width = false;
-       CastBeam( num, new_energy, hit.position, reflected,
+       CastBeam( num, new_energy, hit.position + ( normal * 0.0001f ), new_direction,
                  min_point, max_point, beams, radius,
                  triangles, matrix, bounced );
      } else if( ABSORBED > 0 ) {
