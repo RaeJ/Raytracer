@@ -61,8 +61,8 @@ std::mt19937 generator ( SEED );
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
 std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
-std::uniform_real_distribution<double> uniform_beam(0.001f * 1/0.04, 0.0015f * 1/0.04);
-std::uniform_real_distribution<double> uniform_small(0.002f * 1/0.04, 0.004f * 1/0.04);
+std::uniform_real_distribution<double> uniform_beam(0.001f * 1/extinction_c, 0.0018f * 1/extinction_c);
+std::uniform_real_distribution<double> uniform_small(0.002f * 1/extinction_c, 0.004f * 1/extinction_c);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
 std::normal_distribution<double> normal(0.0, 0.25);
 
@@ -656,6 +656,9 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
    float t_s;
    if( ClosestIntersection( origin, direction, hit, matrix, triangles ) ){
      t_s = glm::length( vec3( hit.position ) - vec3( origin ) );
+     if( t_s < 0.0005 ){
+       return;
+     }
    }
 
    float diff;
@@ -675,7 +678,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec3 dir          = glm::normalize( vec3( x, y, z ) );
        vec4 dir_sample   = vec4( dir.x, dir.y, dir.z, 1.0f );
        float transmitted = Transmittance( t_s, extinction_c );
-       vec3 new_energy   = energy;
+       vec3 new_energy   = energy * transmitted;
 
        PhotonBeam scattered;
        scattered.ada_width = false;
@@ -686,6 +689,19 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        if( SHORT_BEAMS ){
          scatt = true;
        }
+     }
+   } else{
+     // is absorbed
+     float tmp_t_s     = -( log( 1 - uniform( generator ) ) / extinction_c );
+     if( ( tmp_t_s < t_s ) && ( tmp_t_s > 0 ) ){
+       t_s            = tmp_t_s;
+       beam.radius    = radius;
+       beam.energy    = energy;
+       beam.index_hit = -1;
+       beam.start     = origin;
+       beam.end       = origin + ( t_s * glm::normalize( direction ) );
+       beam.absorbed  = true;
+       return;
      }
    }
 
@@ -734,7 +750,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        vec4 reflected        = vec4( glm::normalize( refl ), 1.0f );
        vec4 bounce_dir       = FindDirection( hit.position, hit.position + ( reflected * 0.5f ), 0 );
        vec4 new_direction    = vec4( glm::normalize( vec3( bounce_dir ) ), 1.0f );
-       if( scattered > 0.5 ) new_direction = reflected;
+       if( scattered > 0.8 ) new_direction = reflected;
        float transmitted     = Transmittance( diff, extinction_c );
        vec3 new_energy       = energy * transmitted;
        PhotonBeam bounced;

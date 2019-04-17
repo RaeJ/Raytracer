@@ -470,7 +470,25 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                   double rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                   PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * rad * _int;
+                  // current        += beam.energy * phase_f * rad * _int;
+
+                  float error_1   = glm::length( intersect.entry_point -
+	                                               vec3( beam.end ) );
+	                float error_2   = glm::length( intersect.exit_point -
+	                                               vec3( beam.end ) );
+	                float margin = 0.001f;
+
+                  double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
+
+	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
+	                ( error_2 <= ( seg.radius + margin ) ) ) &&
+	                  beam.absorbed ){
+	                  double transmitted = Transmittance( transmitted_distance, extinction_c );
+                    current        += ( beam.energy * phase_f * rad * _int ) +
+                                      ( beam.energy - ( beam.energy * transmitted ) );
+	                } else {
+	                  current        += beam.energy * phase_f * rad * _int;
+	                }
                 }
               }
             }
@@ -534,7 +552,25 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                   double rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
                   PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * rad * _int;
+                  // current        += beam.energy * phase_f * rad * _int;
+
+                  float error_1   = glm::length( intersect.entry_point -
+	                                               vec3( beam.end ) );
+	                float error_2   = glm::length( intersect.exit_point -
+	                                               vec3( beam.end ) );
+	                float margin = 0.001f;
+
+                  double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
+
+	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
+	                ( error_2 <= ( seg.radius + margin ) ) ) &&
+	                  beam.absorbed ){
+	                  double transmitted = Transmittance( transmitted_distance, extinction_c );
+	                  current        += ( beam.energy * phase_f * rad * _int ) +
+                                      ( beam.energy - ( beam.energy * transmitted ) );
+	                } else {
+	                  current        += beam.energy * phase_f * rad * _int;
+	                }
                 }
               }
             }
