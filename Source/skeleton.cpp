@@ -473,10 +473,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                   // current        += beam.energy * phase_f * rad * _int;
 
                   float error_1   = glm::length( intersect.entry_point -
-	                                               vec3( beam.end ) );
+	                                               vec3( limit.position ) );
 	                float error_2   = glm::length( intersect.exit_point -
-	                                               vec3( beam.end ) );
-	                float margin = 0.001f;
+	                                               vec3( limit.position ) );
+	                float margin = 0.0005f;
 
                   double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
 
@@ -484,8 +484,9 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
 	                ( error_2 <= ( seg.radius + margin ) ) ) &&
 	                  beam.absorbed ){
 	                  double transmitted = Transmittance( transmitted_distance, extinction_c );
-                    current        += ( beam.energy * phase_f * rad * _int ) +
-                                      ( beam.energy - ( beam.energy * transmitted ) );
+                    double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
+                                        , extinction_c );
+                    current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
 	                } else {
 	                  current        += beam.energy * phase_f * rad * _int;
 	                }
@@ -555,9 +556,9 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                   // current        += beam.energy * phase_f * rad * _int;
 
                   float error_1   = glm::length( intersect.entry_point -
-	                                               vec3( beam.end ) );
+	                                               vec3( limit.position ) );
 	                float error_2   = glm::length( intersect.exit_point -
-	                                               vec3( beam.end ) );
+	                                               vec3( limit.position ) );
 	                float margin = 0.001f;
 
                   double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
@@ -565,9 +566,12 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
 	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
 	                ( error_2 <= ( seg.radius + margin ) ) ) &&
 	                  beam.absorbed ){
-	                  double transmitted = Transmittance( transmitted_distance, extinction_c );
-	                  current        += ( beam.energy * phase_f * rad * _int ) +
-                                      ( beam.energy - ( beam.energy * transmitted ) );
+                      double transmitted = Transmittance( transmitted_distance, extinction_c );
+                      double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
+                                          , extinction_c );
+                      // cout << "Transmitted: " << transmitted << endl;
+                      // cout << "to camera: " << to_camera << endl;
+                      current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
 	                } else {
 	                  current        += beam.energy * phase_f * rad * _int;
 	                }
