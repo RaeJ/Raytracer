@@ -78,12 +78,13 @@ void ConvertTo2D( const vec3& point, vec2& p );
 void HitGridBox( const vec4 start,
                  const vec4 dir,
                  const Grid grid,
-                 vector<int>& hit_indexes );
+                 vector<ivec2>& hit_indexes );
 
 void HitGridBox( const vec4 start,
                  const vec4 dir,
                  const Grid grid, // Grid should already be matrix oriented
-                 vector<int>& hit_indexes ){
+                 vector<ivec2>& hit_indexes ){
+    hit_indexes.clear();
     vec2 rayOrigin, projected_point;
     float t_x, t_y;
     ConvertTo2D( vec3( start ), rayOrigin );
@@ -91,56 +92,58 @@ void HitGridBox( const vec4 start,
 
     vec2 rayDirection = glm::normalize( projected_point - rayOrigin ); // assumed normalized
     vec2 gridResolution = vec2( grid.side_points - 1, grid.side_points - 1 );
-    vec2 cellDimension = vec2( ACTUAL_WIDTH, ACTUAL_WIDTH ) / gridResolution;
+    vec2 cellDimension = vec2( SCREEN_WIDTH, SCREEN_HEIGHT ) / gridResolution;
     vec2 deltaT, nextCrossingT;
-    vec2 rayOrigGrid = rayOrigin - vec2( -1, -1 ); //gridMin;
-    // if (rayDirection.x < 0) {
-    //     deltaT.x = -cellDimension.x / rayDirection.x
-    //     t_x = (floor(rayOrigGrid.x / cellDimension.x) * cellDimension.x
-    //         - rayOrigGrid.x) / rayDirection.x;
-    // }
-    // else {
-    //     deltaT.x = cellDimension.x / rayDirection.x;
-    //     t_x = ((floor(rayOrigGrid.x / cellDimension.x) + 1) * cellDimension.x
-    //         - rayOrigGrid.x) / rayDirection.x;
-    // }
-    // if (rayDirection.y < 0) {
-    //     deltaT.y = -cellDimension.y / rayDirection.y
-    //     t_y = (floor(rayOrigGrid.y / cellDimension.y) * cellDimension.y
-    //         - rayOrigGrid.y) / rayDirection.y;
-    // }
-    // else {
-    //     deltaT.y = cellDimension.y / rayDirection.y
-    //     t_y = ((floor(rayOrigGrid.y / cellDimension.y) + 1) * cellDimension.y
-    //         - rayOrigGrid.y) / rayDirection.y;
-    // }
+    vec2 rayOrigGrid = rayOrigin;// - vec2( -1, -1 ); //gridMin;
+    if (rayDirection.x < 0) {
+        deltaT.x = -cellDimension.x / rayDirection.x;
+        t_x = (floor(rayOrigGrid.x / cellDimension.x) * cellDimension.x
+            - rayOrigGrid.x) / rayDirection.x;
+    }
+    else {
+        deltaT.x = cellDimension.x / rayDirection.x;
+        t_x = ((floor(rayOrigGrid.x / cellDimension.x) + 1) * cellDimension.x
+            - rayOrigGrid.x) / rayDirection.x;
+    }
+    if (rayDirection.y < 0) {
+        deltaT.y = -cellDimension.y / rayDirection.y;
+        t_y = (floor(rayOrigGrid.y / cellDimension.y) * cellDimension.y
+            - rayOrigGrid.y) / rayDirection.y;
+    }
+    else {
+        deltaT.y = cellDimension.y / rayDirection.y;
+        t_y = ((floor(rayOrigGrid.y / cellDimension.y) + 1) * cellDimension.y
+            - rayOrigGrid.y) / rayDirection.y;
+    }
 
+    float t = 0;
+    ivec2 cellIndex = floor( rayOrigin / cellDimension ); // origin of the ray (cell index)
 
+    hit_indexes.push_back( cellIndex );
+    while ( true ) {
+        if (t_x < t_y) {
+            t = t_x; // current t, next intersection with cell along ray
+            t_x += deltaT.x; // increment, next crossing along x
+            if (rayDirection.x < 0)
+                cellIndex.x -= 1;
+            else
+                cellIndex.x += 1;
+        }
+        else {
+            t = t_y;
+            t_y += deltaT.y; // increment, next crossing along y
+            if (rayDirection.y < 0)
+                cellIndex.y -= 1;
+            else
+                cellIndex.y += 1;
+        }
+        // if some condition is met break from the loop
+        if ( cellIndex.x < 0 || cellIndex.y < 0 ||
+            cellIndex.x > gridResolution.x || cellIndex.y > gridResolution.y )
+            break;
 
-    // float t = 0;
-    // Vec2i cellIndex = { .., ... }; // origin of the ray (cell index)
-    // while (1) {
-    //     if (t_x < t_y) {
-    //         t = t_x; // current t, next intersection with cell along ray
-    //         t_x += deltaT[0]; // increment, next crossing along x
-    //         if (rayDirection[0] < 0)
-    //             cellIndex[0] -= 1;
-    //         else
-    //             cellIndex[0] += 1;
-    //     }
-    //     else {
-    //         t = t_y;
-    //         t_y += deltaT[1]; // increment, next crossing along y
-    //         if (rayDirection[1] < 0)
-    //             cellIndex[1] -= 1;
-    //         else
-    //             cellIndex[1] += 1;
-    //     }
-    //     // if some condition is met break from the loop
-    //     if (cellIndex[0] < 0 || cellIndex[1] < 0 ||
-    //         cellIndex[0] > gridDimension[0] - 1 || cellIndex[1] > gridDimension[1] - 1)
-    //         break;
-    // }
+        hit_indexes.push_back( cellIndex );
+    }
 }
 
 

@@ -60,8 +60,8 @@ void CreateSurface( int triangle_number, float height, double time  )
     grid_points[i].y = floor( i / width_points ) * triangle_size;
 
     grid_points[i]    -= SHIFT;
-    grid_points[i].x  *= -1;
-    grid_points[i].y  *= -1;
+    grid_points[i].x  *= 1;
+    grid_points[i].y  *= 1;
     grid_points[i].w   = 1.0;
   }
   Grid new_grid;
