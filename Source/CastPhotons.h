@@ -4,7 +4,6 @@
 #include <glm/glm.hpp>
 #include "TestModelH.h"
 #include "rasteriser.h"
-#include "Tessendorf.h"
 #include "Intersections.h"
 #include "Control.h"
 
@@ -61,8 +60,8 @@ std::mt19937 generator ( SEED );
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
 std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
-std::uniform_real_distribution<double> uniform_beam(0.001f * 1/0.04, 0.0018f * 1/0.04);
-std::uniform_real_distribution<double> uniform_small(0.002f * 1/0.04, 0.004f * 1/0.04);
+std::uniform_real_distribution<double> uniform_beam(0.02f, 0.03f);
+	std::uniform_real_distribution<double> uniform_small(0.02f, 0.06f);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
 std::normal_distribution<double> normal(0.0, 0.25);
 

@@ -41,8 +41,8 @@ vec3 light_power = 1.5f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
-float absorption_c = 0.0035;
-float scattering_c = 0.0005;
+float absorption_c = 0.035;
+float scattering_c = 0.005;
 float extinction_c = absorption_c + scattering_c;
 
 vec4 camera(0, 0, -3, 1.0);

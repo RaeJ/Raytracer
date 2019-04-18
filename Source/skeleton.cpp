@@ -60,58 +60,7 @@ double Integral_73( PhotonSeg s,
                    float extinction,
                    vec4 dir  );
 
-void Testing( screen* screen,
-              vec4 start,
-              vec4 direction,
-              vec3& colour,
-              vec3& current,
-              vector<PhotonBeam> beams,
-              vector<PhotonSeg>& items,
-              const mat4& matrix );
-
 // ------------------------------------------------------------------------- //
-
-void Testing( screen* screen,
-  vec4 start,
-  vec4 direction,
-  vec3& colour,
-  vec3& current,
-  vector<PhotonBeam> beams,
-  vector<PhotonSeg>& items,
-  const mat4& matrix ){
-    Intersection c_i;
-    PhotonSeg debugging; CylIntersection intersect;
-    debugging.orig_start = matrix * vec4( 0.0, -0.4, -0.2, 1.0f );
-    debugging.start = matrix * vec4( -0.3, -0.2, -0.5, 1.0f );
-    debugging.end = matrix * vec4( -0.9, 0.2, -1.1, 1.0f );
-    debugging.radius = 0.05;
-    PositionShader( screen, debugging.start, vec3( 1, 1, 0 ) );
-    PositionShader( screen, debugging.end, vec3( 1, 1, 0 ) );
-    if( HitCone( start, direction, debugging, intersect ) ){
-      colour = vec3( 0.3, 0, 0.7 );
-      vec4 light_location = matrix * light_position;
-      vec4 position       = vec4( intersect.entry_point, 1.0f );
-      vec3 radius = vec3 ( light_location ) - vec3( position );
-      float A = 4 * PI * glm::dot( radius, radius );
-      vec4 normal = vec4( intersect.entry_normal, 1.0f );
-      float r_dot_n = glm::dot( glm::normalize( radius ), glm::normalize( vec3( normal ) ) );
-      r_dot_n = max( r_dot_n, 0.0f );
-      vec4 direction = glm::normalize( vec4( radius, 1.0f ) );
-      vec4 start = position + 0.001f * normal;
-      Intersection c_i;
-      ClosestIntersection( start, direction, c_i, matrix, triangles );
-      if( c_i.distance < glm::length( start - light_location ) ){
-        r_dot_n = 0;
-      }
-      current += ( light_power * r_dot_n ) / A;
-    }
-    vec4 center = matrix * vec4( 0.8, 1, -0.5, 1 );
-    float radius = 0.2;
-    BasicIntersection intersect2;
-    if( SphereIntersection( vec3( start ), vec3( direction ), radius, vec3( center ), intersect2 ) ){
-      colour = vec3( 0.3, 0, 0.7 );
-    }
-}
 
 int main( int argc, char* argv[] )
 {
@@ -120,7 +69,7 @@ int main( int argc, char* argv[] )
     RunAnalysis();
   }
 
-  CreateSurface( 10, 0.0, 1.004 );
+  CreateSurface( 10, -1.0, 1.004 );
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -200,6 +149,10 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       }
       // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (double) SSAA );
+    }
+    for( int i=0; i<GRID.geometric_points.size(); i++ ){
+      PositionShader( screen, matrix*GRID.geometric_points[i], vec3( 1, 0, 0 ) );
+      // cout << GRID.geometric_points[i].z << endl;
     }
     SDL_Renderframe(screen);
   }
@@ -349,7 +302,7 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
   glm::dvec3 ab   = glm::normalize( b - a );
   glm::dvec3 cd   = glm::normalize( d - c );
 
-  glm::dvec3 ab_cross_cd = glm::cross( ab, cd );
+  // glm::dvec3 ab_cross_cd = glm::cross( ab, cd );
 
   // PQ = a + t*ab - ( c + s*cd ) = a - c + ( t*ab - s*cd )
   // PQ = k( ab_cross_cd )
@@ -366,7 +319,7 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
   if( ( denominator != 0 ) && ( u_dot_u != 0 ) && ( v_dot_v != 0 ) ){
     double t_ab = ( glm::dot( u_dot_v, v_dot_w ) - glm::dot( v_dot_v, u_dot_w ) ) / denominator;
     double t_cd = ( glm::dot( u_dot_u, v_dot_w ) - glm::dot( u_dot_v, u_dot_w ) ) / denominator;
-    double distance = glm::length( a - c + ( t_ab * ab ) - ( t_cd * cd ) );
+    // double distance = glm::length( a - c + ( t_ab * ab ) - ( t_cd * cd ) );
 
     glm::dvec3 point_beam = a + ( t_ab * ab );
     glm::dvec3 point_view = c + ( t_cd * cd );
@@ -478,14 +431,14 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
 	                                               vec3( limit.position ) );
 	                float margin = 0.0005f;
 
-                  double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
+                  // double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
 
 	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
 	                ( error_2 <= ( seg.radius + margin ) ) ) &&
 	                  beam.absorbed ){
-	                  double transmitted = Transmittance( transmitted_distance, extinction_c );
-                    double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
-                                        , extinction_c );
+	                  // double transmitted = Transmittance( transmitted_distance, extinction_c );
+                    // double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
+                                        // , extinction_c );
                     current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
 	                } else {
 	                  current        += beam.energy * phase_f * rad * _int;
@@ -561,14 +514,14 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
 	                                               vec3( limit.position ) );
 	                float margin = 0.001f;
 
-                  double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
+                  // double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
 
 	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
 	                ( error_2 <= ( seg.radius + margin ) ) ) &&
 	                  beam.absorbed ){
-                      double transmitted = Transmittance( transmitted_distance, extinction_c );
-                      double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
-                                          , extinction_c );
+                      // double transmitted = Transmittance( transmitted_distance, extinction_c );
+                      // double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
+                      //                     , extinction_c );
                       // cout << "Transmitted: " << transmitted << endl;
                       // cout << "to camera: " << to_camera << endl;
                       current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
