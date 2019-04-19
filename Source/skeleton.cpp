@@ -154,22 +154,27 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (double) SSAA );
     }
-    for( int i=0; i<GRID.geometric_points.size(); i++ ){
-      PositionShader( screen, GRID.geometric_points[i], vec3( 1, 0, 0 ) );
-      // cout << GRID.geometric_points[i].z << endl;
-    }
+    // for( int i=0; i<GRID.geometric_points.size(); i++ ){
+    //   PositionShader( screen, GRID.geometric_points[i], vec3( 1, 0, 0 ) );
+    //   // cout << GRID.geometric_points[i].z << endl;
+    // }
     vector<ivec2> hit_indexes;
+    vector<float> distances;
     Vertex v1, v2;
     v1.position = matrix * light_position;
     v1.position.x += 0.05;
-    v2.position = matrix * vec4( 0.3, 0, 0, 1.0f );
-    HitGridBox( v1.position,  v2.position - v1.position, GRID, hit_indexes );
-    DrawLine( screen, v1, v2, vec3( 0, 0, 1 ) );
-    for( int i=0; i<hit_indexes.size(); i++ ){
-      int index = ( ( hit_indexes[i].y ) * ( GRID.side_points ) ) + hit_indexes[i].x;
-      PositionShader( screen, GRID.geometric_points[index], vec3( 0, 1, 0 ) );
-    }
-    PositionShader( screen, GRID.geometric_points[0], vec3( 1, 1, 0 ) );
+    v2.position = matrix * vec4( -0.3, 0, 0, 1.0f );
+    HitGridBox( screen, v1.position,  v2.position - v1.position, GRID, hit_indexes, distances );
+    // DrawLine( screen, v1, v2, vec3( 0, 0, 1 ) );
+    // for( int i=0; i<hit_indexes.size(); i++ ){
+    //   int index = ( ( hit_indexes[i].y ) * ( GRID.side_points ) ) + hit_indexes[i].x;
+    //   PositionShader( screen, GRID.geometric_points[index], vec3( 0, 1, 0 ) );
+    //   vec3 intersection_point = ( glm::normalize( vec3( v2.position ) - vec3( v1.position ) ) *
+    //                             distances[i] ) + vec3( v1.position );
+    //   PositionShader( screen, vec4( intersection_point, 1.0f ), vec3( 0, 1, 0 ) );
+    //   cout << distances[i] << endl;
+    // }
+    PositionShader( screen, GRID.geometric_points[0], vec3( 1, 0, 1 ) );
     SDL_Renderframe(screen);
   }
 }

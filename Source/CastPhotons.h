@@ -3,7 +3,6 @@
 
 #include <glm/glm.hpp>
 #include "TestModelH.h"
-#include "rasteriser.h"
 #include "Intersections.h"
 #include "Control.h"
 

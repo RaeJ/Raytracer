@@ -2,6 +2,7 @@
 #define INTERSECTIONS_H
 
 #include "Tessendorf.h"
+#include "rasteriser.h"
 
 // -------------------------------------------------------------------------- //
 // STRUCTS
@@ -75,24 +76,35 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 mat3 findRotationMatrix( vec3 current_dir,
                          vec3 wanted_dir );
 void ConvertTo2D( const vec3& point, vec2& p );
-void HitGridBox( const vec4 start,
+void HitGridBox( screen* screen,
+                 const vec4 start,
                  const vec4 dir,
                  const Grid grid,
-                 vector<ivec2>& hit_indexes );
+                 vector<ivec2>& hit_indexes,
+                 vector<float>& distances );
 
-void HitGridBox( const vec4 start,
+void HitGridBox( screen* screen,
+                 const vec4 start,
                  const vec4 dir,
                  const Grid grid, // Grid should already be matrix oriented
-                 vector<ivec2>& hit_indexes ){
+                 vector<ivec2>& hit_indexes,
+                 vector<float>& distances ){
     hit_indexes.clear();
     vec2 rayOrigin, projected_point;
     float t_x, t_y;
     ConvertTo2D( vec3( start ), rayOrigin );
     ConvertTo2D( vec3( start + dir ), projected_point );
+    float scale = glm::length( projected_point - rayOrigin ) /
+                  glm::length( vec3( start ) - vec3( start + dir ) );
 
     vec2 rayDirection = glm::normalize( projected_point - rayOrigin ); // assumed normalized
     vec2 gridResolution = vec2( grid.side_points - 1, grid.side_points - 1 );
     vec2 cellDimension = vec2( SCREEN_WIDTH, SCREEN_HEIGHT ) / gridResolution;
+    for( int x=0; x<(cellDimension.x*gridResolution.x); x=x+cellDimension.x ){
+      for( int y=0; y<(cellDimension.y*gridResolution.y); y=y+cellDimension.y ){
+        PixelShader( screen, x, y, vec3( 1, 0, 0 ) );
+      }
+    }
     vec2 deltaT, nextCrossingT;
     vec2 rayOrigGrid = rayOrigin;// - vec2( -1, -1 ); //gridMin;
     if (rayDirection.x < 0) {
@@ -121,6 +133,9 @@ void HitGridBox( const vec4 start,
 
     hit_indexes.push_back( cellIndex );
     while ( true ) {
+      vec2 point = rayOrigin + ( t * rayDirection );
+      PixelShader( screen, point.x, point.y, vec3( 1, 1, 0 ) );
+      distances.push_back( t / scale );
         if (t_x < t_y) {
             t = t_x; // current t, next intersection with cell along ray
             t_x += deltaT.x; // increment, next crossing along x
