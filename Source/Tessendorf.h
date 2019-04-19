@@ -56,7 +56,7 @@ void CreateSurface( int triangle_number, float height, double time  )
   std::vector<vec4> grid_points( total_points );
   for( int i=0; i<total_points; i++ ){
     grid_points[i].x = ( i % width_points ) * triangle_size;
-    grid_points[i].z = height;
+    grid_points[i].z = 0.0;
     grid_points[i].y = floor( i / width_points ) * triangle_size;
 
     grid_points[i]    -= SHIFT;
@@ -125,7 +125,7 @@ void UpdateHeight( double time )
       }
     }
     GRID.geometric_points[i].z = abs( result );
-    GRID.geometric_points[i].z += GRID.height;
+    // GRID.geometric_points[i].z += GRID.height;
     // GRID.geometric_points[i].y *= -1;
   }
   AddTessendorfWaves();

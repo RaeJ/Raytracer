@@ -1,9 +1,6 @@
 #ifndef INTERSECTIONS_H
 #define INTERSECTIONS_H
 
-#include "Tessendorf.h"
-#include "rasteriser.h"
-
 // -------------------------------------------------------------------------- //
 // STRUCTS
 
@@ -75,92 +72,6 @@ bool HitCone( const vec4 start,
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit );
 mat3 findRotationMatrix( vec3 current_dir,
                          vec3 wanted_dir );
-void ConvertTo2D( const vec3& point, vec2& p );
-void HitGridBox( screen* screen,
-                 const vec4 start,
-                 const vec4 dir,
-                 const Grid grid,
-                 vector<ivec2>& hit_indexes,
-                 vector<float>& distances );
-
-void HitGridBox( screen* screen,
-                 const vec4 start,
-                 const vec4 dir,
-                 const Grid grid, // Grid should already be matrix oriented
-                 vector<ivec2>& hit_indexes,
-                 vector<float>& distances ){
-    hit_indexes.clear();
-    vec2 rayOrigin, projected_point;
-    float t_x, t_y;
-    ConvertTo2D( vec3( start ), rayOrigin );
-    ConvertTo2D( vec3( start + dir ), projected_point );
-    float scale = glm::length( projected_point - rayOrigin ) /
-                  glm::length( vec3( start ) - vec3( start + dir ) );
-
-    vec2 rayDirection = glm::normalize( projected_point - rayOrigin ); // assumed normalized
-    vec2 gridResolution = vec2( grid.side_points - 1, grid.side_points - 1 );
-    vec2 cellDimension = vec2( SCREEN_WIDTH, SCREEN_HEIGHT ) / gridResolution;
-    for( int x=0; x<(cellDimension.x*gridResolution.x); x=x+cellDimension.x ){
-      for( int y=0; y<(cellDimension.y*gridResolution.y); y=y+cellDimension.y ){
-        PixelShader( screen, x, y, vec3( 1, 0, 0 ) );
-      }
-    }
-    vec2 deltaT, nextCrossingT;
-    vec2 rayOrigGrid = rayOrigin;// - vec2( -1, -1 ); //gridMin;
-    if (rayDirection.x < 0) {
-        deltaT.x = -cellDimension.x / rayDirection.x;
-        t_x = (floor(rayOrigGrid.x / cellDimension.x) * cellDimension.x
-            - rayOrigGrid.x) / rayDirection.x;
-    }
-    else {
-        deltaT.x = cellDimension.x / rayDirection.x;
-        t_x = ((floor(rayOrigGrid.x / cellDimension.x) + 1) * cellDimension.x
-            - rayOrigGrid.x) / rayDirection.x;
-    }
-    if (rayDirection.y < 0) {
-        deltaT.y = -cellDimension.y / rayDirection.y;
-        t_y = (floor(rayOrigGrid.y / cellDimension.y) * cellDimension.y
-            - rayOrigGrid.y) / rayDirection.y;
-    }
-    else {
-        deltaT.y = cellDimension.y / rayDirection.y;
-        t_y = ((floor(rayOrigGrid.y / cellDimension.y) + 1) * cellDimension.y
-            - rayOrigGrid.y) / rayDirection.y;
-    }
-
-    float t = 0;
-    ivec2 cellIndex = floor( rayOrigin / cellDimension ); // origin of the ray (cell index)
-
-    hit_indexes.push_back( cellIndex );
-    while ( true ) {
-      vec2 point = rayOrigin + ( t * rayDirection );
-      PixelShader( screen, point.x, point.y, vec3( 1, 1, 0 ) );
-      distances.push_back( t / scale );
-        if (t_x < t_y) {
-            t = t_x; // current t, next intersection with cell along ray
-            t_x += deltaT.x; // increment, next crossing along x
-            if (rayDirection.x < 0)
-                cellIndex.x -= 1;
-            else
-                cellIndex.x += 1;
-        }
-        else {
-            t = t_y;
-            t_y += deltaT.y; // increment, next crossing along y
-            if (rayDirection.y < 0)
-                cellIndex.y -= 1;
-            else
-                cellIndex.y += 1;
-        }
-        // if some condition is met break from the loop
-        if ( cellIndex.x < 0 || cellIndex.y < 0 ||
-            cellIndex.x > gridResolution.x || cellIndex.y > gridResolution.y )
-            break;
-
-        hit_indexes.push_back( cellIndex );
-    }
-}
-
 
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
   const int DIMS = 3; int RIGHT=0; int LEFT=1; int MIDDLE=2;
@@ -548,22 +459,14 @@ bool ClosestIntersection( vec4 start, vec4 dir,
   closestIntersections.distance = m;
 
   int vec_size        = triangles.size();
-  int triangle_number = vec_size + waves.size();
 
-  for(int i = 0; i < triangle_number; i++){
+  for(int i = 0; i < vec_size; i++){
     vec4 v0, v1, v2;
-    if( i < vec_size ){
-      v0 = matrix * triangles[i].v0;
-      v1 = matrix * triangles[i].v1;
-      v2 = matrix * triangles[i].v2;
-      closestIntersections.water = false;
-    }
-    // else {
-    //   v0 = matrix * waves[i-vec_size].v0;
-    //   v1 = matrix * waves[i-vec_size].v1;
-    //   v2 = matrix * waves[i-vec_size].v2;
-    //   closestIntersections.water = true;
-    // }
+    v0 = matrix * triangles[i].v0;
+    v1 = matrix * triangles[i].v1;
+    v2 = matrix * triangles[i].v2;
+    // TODO: remove features relating to water
+    closestIntersections.water = false;
 
     vec3 e1 = vec3(v1.x-v0.x, v1.y-v0.y, v1.z-v0.z);
     vec3 e2 = vec3(v2.x-v0.x, v2.y-v0.y, v2.z-v0.z);
@@ -587,18 +490,6 @@ bool ClosestIntersection( vec4 start, vec4 dir,
     }
   }
   return found;
-}
-
-void ConvertTo2D( const vec3& point, vec2& p ){
-  float x = 0; float y = 0;
-
-  if( point.z != 0 ){
-    // The 2D position
-    x = ( focal * ( point.x / (float) point.z ) ) + ( ( SCREEN_WIDTH * SSAA ) / (float) 2 );
-    y = ( focal * ( point.y / (float) point.z ) ) + ( ( SCREEN_HEIGHT * SSAA ) / (float) 2 );
-  }
-
-  p.x = x;  p.y = y;
 }
 
 mat3 findRotationMatrix( vec3 c_unit_dir, vec3 w_unit_dir ){

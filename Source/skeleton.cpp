@@ -158,13 +158,13 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     //   PositionShader( screen, GRID.geometric_points[i], vec3( 1, 0, 0 ) );
     //   // cout << GRID.geometric_points[i].z << endl;
     // }
-    vector<ivec2> hit_indexes;
-    vector<float> distances;
-    Vertex v1, v2;
-    v1.position = matrix * light_position;
-    v1.position.x += 0.05;
-    v2.position = matrix * vec4( -0.3, 0, 0, 1.0f );
-    HitGridBox( screen, v1.position,  v2.position - v1.position, GRID, hit_indexes, distances );
+    // vector<ivec2> hit_indexes;
+    // vector<float> distances;
+    // Vertex v1, v2;
+    // v1.position = matrix * light_position;
+    // v1.position.x += 0.05;
+    // v2.position = matrix * vec4( -0.3, 0, 0, 1.0f );
+    // HitGridBox( screen, v1.position,  v2.position - v1.position, GRID, hit_indexes, distances );
     // DrawLine( screen, v1, v2, vec3( 0, 0, 1 ) );
     // for( int i=0; i<hit_indexes.size(); i++ ){
     //   int index = ( ( hit_indexes[i].y ) * ( GRID.side_points ) ) + hit_indexes[i].x;
@@ -174,7 +174,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     //   PositionShader( screen, vec4( intersection_point, 1.0f ), vec3( 0, 1, 0 ) );
     //   cout << distances[i] << endl;
     // }
-    PositionShader( screen, GRID.geometric_points[0], vec3( 1, 0, 1 ) );
+    // PositionShader( screen, GRID.geometric_points[0], vec3( 1, 0, 1 ) );
     SDL_Renderframe(screen);
   }
 }

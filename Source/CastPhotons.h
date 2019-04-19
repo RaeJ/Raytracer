@@ -2,9 +2,11 @@
 #define CAST_PHOTONS_H
 
 #include <glm/glm.hpp>
+#include "Control.h"
 #include "TestModelH.h"
 #include "Intersections.h"
-#include "Control.h"
+#include "Heterogeneous.h"
+
 
 // -------------------------------------------------------------------------- //
 // STRUCTS
