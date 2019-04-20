@@ -23,6 +23,8 @@
 #define FIXED_RADIUS false
 #define RADIUS 0.002f * 1/0.04
 
+#define HETEROGENEOUS true
+
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.0f
 
@@ -37,7 +39,7 @@ using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.5,1);
 // vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
-vec3 light_power = 1.5f * vec3( 1, 1, 1 );
+vec3 light_power = 0.0f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 

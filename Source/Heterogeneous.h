@@ -4,21 +4,128 @@
 #include "Tessendorf.h"
 #include "rasteriser.h"
 
+void DrawBox( screen* screen, vec4 min, vec4 max, vec3 colour );
 void ConvertTo2D( const vec3& point, vec2& p );
-float Extinction( screen* screen,
-                 const vec4 start,
-                 const vec4 dir,
-                 const Grid grid );
+float Extinction( const vec4 start,
+                  const vec4 end,
+                  const Grid grid,
+                  vector<vec2>& dist_ext );
+float Extinction3D( screen* screen,
+                    const vec4 start,
+                    const vec4 dir,
+                    const Grid grid,
+                    vector<vec2>& dist_ext );
 float FindAverageExtinction( const vec2& start, const vec2& direction,
                             const vector<float>& distances,
                             const vector<ivec2>& indexes,
                             const vec2& cell_dimension,
                             vector<float>& extinctions );
 
-float Extinction( screen* screen,
-                 const vec4 start,
-                 const vec4 dir,
-                 const Grid grid /* Grid should already be matrix oriented*/){
+// TODO: Test extinction 3D
+float Extinction3D( screen* screen,
+                    const vec4 start,
+                    const vec4 end,
+                    const Grid grid,
+                    vector<vec2>& dist_ext ){
+
+    float t_x, t_y, t_z, t_max;
+    vec3 grid_min = vec3( -1, -1, 2 );
+    vec3 ray_direction = glm::normalize( vec3( end ) - vec3( start ) ); // assumed normalized
+    vec3 grid_resolution = vec3( grid.side_points - 1, grid.side_points - 1, ACTUAL_WIDTH );
+    vec3 cell_dimension = vec3( ACTUAL_WIDTH, ACTUAL_WIDTH, ACTUAL_WIDTH ) / grid_resolution;
+    vec3 delta_t;
+    vec3 ray_orig_grid = vec3( start ) - grid_min;
+
+    t_max = glm::length( vec3( end ) - vec3( start ) );
+
+    for( int x=0; x<grid.side_points - 1; x++ ){
+      for( int y=0; y<grid.side_points - 1; y++ ){
+        vec4 min = vec4( ( vec3( x, y, 0) * cell_dimension ) + grid_min, 1.0f );
+        vec4 max = vec4( ( x + 1 ) * cell_dimension.x + grid_min.x,
+                         ( y + 1 ) * cell_dimension.y + grid_min.y,
+                         ( 1 ) * cell_dimension.z + grid_min.z, 1.0f );
+        DrawBox( screen, min, max, vec3( 0, 0, 1 ) );
+      }
+    }
+
+    if ( ray_direction.x < 0 ) {
+        delta_t.x = -cell_dimension.x / ray_direction.x;
+        t_x = ( floor( ray_orig_grid.x / cell_dimension.x ) * cell_dimension.x
+            - ray_orig_grid.x ) / ray_direction.x;
+    }
+    else {
+        delta_t.x = cell_dimension.x / ray_direction.x;
+        t_x = ( ( floor( ray_orig_grid.x / cell_dimension.x ) + 1 ) * cell_dimension.x
+            - ray_orig_grid.x ) / ray_direction.x;
+    }
+    if ( ray_direction.y < 0 ) {
+        delta_t.y = -cell_dimension.y / ray_direction.y;
+        t_y = ( floor( ray_orig_grid.y / cell_dimension.y ) * cell_dimension.y
+            - ray_orig_grid.y ) / ray_direction.y;
+    }
+    else {
+        delta_t.y = cell_dimension.y / ray_direction.y;
+        t_y = ( ( floor( ray_orig_grid.y / cell_dimension.y ) + 1 ) * cell_dimension.y
+            - ray_orig_grid.y ) / ray_direction.y;
+    }
+    if ( ray_direction.z < 0 ) {
+        delta_t.z = -cell_dimension.z / ray_direction.z;
+        t_z = ( floor( ray_orig_grid.z / cell_dimension.z ) * cell_dimension.z
+            - ray_orig_grid.z ) / ray_direction.z;
+    }
+    else {
+        delta_t.z = cell_dimension.z / ray_direction.z;
+        t_z = ( ( floor( ray_orig_grid.z / cell_dimension.z ) + 1 ) * cell_dimension.z
+            - ray_orig_grid.z ) / ray_direction.z;
+    }
+
+    float t = 0;
+    vec3 cell_index = floor( ray_orig_grid / cell_dimension );
+
+    while ( true ) {
+      vec4 min = vec4( ( cell_index * cell_dimension ) + grid_min, 1.0f );
+      vec4 max = vec4( ( cell_index.x + 1 ) * cell_dimension.x + grid_min.x,
+                       ( cell_index.y + 1 ) * cell_dimension.y + grid_min.y,
+                       ( cell_index.z + 1 ) * cell_dimension.z + grid_min.z, 1.0f );
+      DrawBox( screen, min, max, purple );
+      dist_ext.push_back( vec2( t, 0 ) );
+        if ( ( t_x < t_y ) && ( t_x < t_z )) {
+            t = t_x; // current t, next intersection with cell along ray
+            t_x += delta_t.x; // increment, next crossing along x
+            if ( ray_direction.x < 0 )
+                cell_index.x -= 1;
+            else
+                cell_index.x += 1;
+        } else if( t_y < t_z ){
+            t = t_y;
+            t_y += delta_t.y; // increment, next crossing along y
+            if ( ray_direction.y < 0 )
+                cell_index.y -= 1;
+            else
+                cell_index.y += 1;
+        } else {
+            t = t_z;
+            t_z += delta_t.z; // increment, next crossing along z
+            if ( ray_direction.z < 0 )
+                cell_index.z -= 1;
+            else
+                cell_index.z += 1;
+        }
+        // if some condition is met break from the loop
+        if ( cell_index.x < 0 || cell_index.y < 0 || cell_index.z < 0 ||
+            cell_index.x > grid_resolution.x ||
+            cell_index.y > grid_resolution.y ||
+            cell_index.z > grid_resolution.z ||
+            t > t_max )
+            break;
+    }
+}
+
+float Extinction( const vec4 start,
+                  const vec4 dir,
+                  const Grid grid,
+                  vector<vec2>& dist_ext ){
+    dist_ext.clear();
 
     vec2 rayOrigin, projected_point;
     float t_x, t_y;
@@ -78,7 +185,8 @@ float Extinction( screen* screen,
         }
         // if some condition is met break from the loop
         if ( cellIndex.x < 0 || cellIndex.y < 0 ||
-            cellIndex.x > gridResolution.x || cellIndex.y > gridResolution.y )
+            cellIndex.x > gridResolution.x ||
+            cellIndex.y > gridResolution.y )
             break;
     }
     vector<float> extinctions;
@@ -88,6 +196,9 @@ float Extinction( screen* screen,
                                     indexes,
                                     cellDimension,
                                     extinctions );
+    for( int i=0; i<indexes.size(); i++ ){
+      dist_ext.push_back( vec2( distances[i], extinctions[i] ) );
+    }
     return average_extinction;
 }
 
@@ -134,4 +245,47 @@ void ConvertTo2D( const vec3& point, vec2& p ){
 
   p.x = x;  p.y = y;
 }
+
+void DrawBox( screen* screen, vec4 min, vec4 max, vec3 colour ){
+  vector<Vertex> vertices(4);
+
+  vertices[0].position  = max;
+  vertices[1].position  = vec4( min.x, max.y, max.z, 1.0f );
+  vertices[2].position  = vec4( min.x, min.y, max.z, 1.0f );
+  vertices[3].position  = vec4( max.x, min.y, max.z, 1.0f );
+
+  ComputePolygonEdges( screen, vertices );
+
+  vector<Vertex> vertices_1(4);
+  vertices_1[0].position  = vec4( max.x, max.y, min.z, 1.0f );
+  vertices_1[1].position  = vec4( min.x, max.y, min.z, 1.0f );
+  vertices_1[2].position  = min;
+  vertices_1[3].position  = vec4( max.x, min.y, min.z, 1.0f );
+
+  ComputePolygonEdges( screen, vertices_1 );
+
+  DrawLine( screen, vertices[0], vertices_1[0], colour );
+  DrawLine( screen, vertices[1], vertices_1[1], colour );
+  DrawLine( screen, vertices[2], vertices_1[2], colour );
+  DrawLine( screen, vertices[3], vertices_1[3], colour );
+
+  DrawLine( screen, vertices[0], vertices[1], colour );
+  DrawLine( screen, vertices[1], vertices[2], colour );
+  DrawLine( screen, vertices[2], vertices[3], colour );
+  DrawLine( screen, vertices[3], vertices[0], colour );
+
+  DrawLine( screen, vertices_1[0], vertices_1[1], colour );
+  DrawLine( screen, vertices_1[1], vertices_1[2], colour );
+  DrawLine( screen, vertices_1[2], vertices_1[3], colour );
+  DrawLine( screen, vertices_1[3], vertices_1[0], colour );
+
+  Pixel proj1; Vertex min_v; min_v.position = min;
+  Pixel proj2; Vertex max_v; max_v.position = max;
+
+  VertexShader( min_v, proj1 );
+  VertexShader( max_v, proj2 );
+  PixelShader( screen, proj1.x, proj1.y, white );
+  PixelShader( screen, proj2.x, proj2.y, black );
+}
+
 #endif

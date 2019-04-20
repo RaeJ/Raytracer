@@ -89,12 +89,12 @@ void ComputePolygonEdges( screen* screen, const vector<Vertex>& vertices ){
     edges[i] = result;
   }
 
-  for( int i=0; i<edges.size(); i++ ){
-    vector<Pixel> edge = edges[i];
-    for( int j=0; j<edge.size(); j++ ){
-      PixelShader( screen, edge[j].x, edge[j].y, purple );
-    }
-  }
+  // for( int i=0; i<edges.size(); i++ ){
+  //   vector<Pixel> edge = edges[i];
+  //   for( int j=0; j<edge.size(); j++ ){
+  //     PixelShader( screen, edge[j].x, edge[j].y, purple );
+  //   }
+  // }
 }
 
 void PositionShader( screen* screen, vec4 position, vec3 colour ){

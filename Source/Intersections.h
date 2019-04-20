@@ -44,6 +44,8 @@ struct PhotonSeg
   float radius;
   bool ada_width;
   int id;
+  float s_ext;
+  float e_ext;
 };
 
 // -------------------------------------------------------------------------- //
