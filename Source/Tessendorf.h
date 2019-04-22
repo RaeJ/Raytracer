@@ -31,7 +31,7 @@ vector<Triangle> waves;
 float gravity = 9.8;
 glm::vec2 wind_dir( 0.424, 0.316 );
 float max_wave = 0.4;
-float amplitude = 0.02;
+float amplitude = 0.01;
 // float max_wave = ( glm::dot( wind_dir, wind_dir ) ) / gravity;
 float step = HALF_W/5;
 // int N = 64;
@@ -56,7 +56,7 @@ void CreateSurface( int triangle_number, float height, double time  )
   std::vector<vec4> grid_points( total_points );
   for( int i=0; i<total_points; i++ ){
     grid_points[i].x = ( i % width_points ) * triangle_size;
-    grid_points[i].z = 0.0;
+    grid_points[i].z = height;
     grid_points[i].y = floor( i / width_points ) * triangle_size;
 
     grid_points[i]    -= SHIFT;
@@ -125,7 +125,7 @@ void UpdateHeight( double time )
       }
     }
     GRID.geometric_points[i].z = abs( result );
-    // GRID.geometric_points[i].z += GRID.height;
+    GRID.geometric_points[i].z += GRID.height;
     // GRID.geometric_points[i].y *= -1;
   }
   AddTessendorfWaves();

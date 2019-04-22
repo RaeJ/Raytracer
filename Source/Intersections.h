@@ -46,6 +46,8 @@ struct PhotonSeg
   int id;
   float s_ext;
   float e_ext;
+  float c_ext;
+  int seg_id;
 };
 
 // -------------------------------------------------------------------------- //

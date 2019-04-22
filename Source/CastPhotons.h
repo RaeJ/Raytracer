@@ -62,7 +62,7 @@ std::uniform_real_distribution<double> uniform(0.0, 1.0);
 std::uniform_real_distribution<double> uniform_offset(-0.01, 0.01);
 std::uniform_real_distribution<double> uniform_radius(0.0, 0.05);
 std::uniform_real_distribution<double> uniform_beam(0.02f, 0.03f);
-	std::uniform_real_distribution<double> uniform_small(0.02f, 0.06f);
+std::uniform_real_distribution<double> uniform_small(0.02f, 0.06f);
 std::uniform_real_distribution<double> uniform_PI(0.0, PI);
 std::normal_distribution<double> normal(0.0, 0.25);
 
@@ -107,7 +107,6 @@ void DrawTree( Node* parent, screen* screen );
 // -------------------------------------------------------------------------- //
 // IMPLEMENTATION
 
-// TODO: Fix this function at some point
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, const vector<Triangle>& triangles ){
  vec3 x_dir     = glm::normalize( vec3( 1, 0, 0 ) );
  vec3 y_dir     = glm::normalize( vec3( 0, 1, 0 ) );
@@ -128,22 +127,17 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float cos_x  = glm::dot( abs( dir ), x_dir );
    float cos_y  = glm::dot( abs( dir ), y_dir );
 
-   float step   = length;//0.02;
+   float step   = 0.02;
 
    vector<vec2> dist_ext;
    int current_step = 1;
+   float mean = 0;
    if( HETEROGENEOUS ){
-     Extinction( start, vec4( dir, 1.0f ), GRID, dist_ext );
-     // NOTE: THIS STEP IS FOR 2D SO WILL NOT WORK!!!
+     Extinction3D( start, end, GRID, dist_ext );
      step = fmin( length, dist_ext[current_step].x ); //[0] would be zero
    } else if( b.ada_width ) {
      step = length;
    }
-
-   if( b.ada_width ){
-     step = length;
-   }
-
 
    vec3 prior   = vec3( start.x, start.y, start.z );
 
@@ -152,8 +146,17 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      vec3 next = prior + ( dir * step );
 
      beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
+     if( HETEROGENEOUS ){
+       mean = mean + ( ( dist_ext[current_step-1].y - mean ) / current_step );
+     } else {
+       mean = extinction_c;
+     }
+     beam_seg.c_ext  = mean;
+     beam_seg.seg_id = current_step;
 
-     if( next.x >= end.x || next.y >= end.y || next.z >= end.z ){
+
+
+     if( length <= glm::length( vec3( next ) - vec3( start ) ) ){
        j = glm::length( length );
        beam_seg.end = vec4( end.x, end.y, end.z, 1.0f );
      } else {
@@ -161,10 +164,12 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        beam_seg.end = vec4( next.x, next.y, next.z, 1.0f );
      }
 
+
      prior = vec3( beam_seg.end );
 
      beam_seg.orig_start = start;
      beam_seg.orig_start.w = 1.0f;
+
 
      if( b.ada_width ){
        vec3 omega_u        = glm::normalize( vec3( b.omega_u ) );
@@ -225,24 +230,20 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
                                  beam_seg.max.z, 1.0f );
          }
        }
+
      }
 
      beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
-
      if( HETEROGENEOUS ){
        beam_seg.s_ext = dist_ext[current_step].y;
 
        current_step++;
-       step           = dist_ext[current_step].x - step;
+
+       step           = dist_ext[current_step].x - dist_ext[current_step-1].x;
        beam_seg.e_ext = dist_ext[current_step].y;
-     } else {
-       beam_seg.s_ext = extinction_c;
-       beam_seg.e_ext = extinction_c;
      }
 
      items.push_back( beam_seg );
-
-
    }
  }
 }
@@ -340,9 +341,11 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
      if( t_s < 0.0005 ){
        return;
      }
+   } else {
+     t_s = ACTUAL_WIDTH;
    }
    if( HETEROGENEOUS ){
-     average_extinction = Extinction( origin, direction, GRID, dist_ext );
+     average_extinction = Extinction3D( origin, origin + ( direction * t_s ), GRID, dist_ext );
    } else {
      average_extinction = extinction_c;
    }
@@ -648,7 +651,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }
          // else {
          //   // TODO: what to do here?
-         //   parent->segments[i%2] = child[i];
+           // parent->segments[i%2] = child[i];
          //   // segments.push_back( child[i] );
          // }
        }

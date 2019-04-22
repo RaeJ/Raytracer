@@ -70,12 +70,22 @@ int main( int argc, char* argv[] )
   }
 
   cout << "Creating grid" << endl;
-  CreateSurface( 10, -1.0, 1.004 );
+  CreateSurface( 37, -3.0, 1.006 );
   mat4 matrix;  TransformationMatrix( matrix );
   root_matrix = matrix;
-  for( int i=0; i<GRID.geometric_points.size(); i++ ){
-    GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
-  }
+  float minimum = 10;
+  float maximum = -10;
+  // for( int i=0; i<GRID.geometric_points.size(); i++ ){
+  //   GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+  //   if( GRID.geometric_points[i].z < minimum ){
+  //     cout << "Min: " << GRID.geometric_points[i].z << endl;
+  //     minimum = GRID.geometric_points[i].z;
+  //   }
+  //   if( GRID.geometric_points[i].z > maximum ){
+  //     cout << "Max: " << GRID.geometric_points[i].z << endl;
+  //     maximum = GRID.geometric_points[i].z;
+  //   }
+  // }
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -154,34 +164,17 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (double) SSAA );
     }
-    // for( int i=0; i<GRID.geometric_points.size(); i++ ){
-    //   PositionShader( screen, GRID.geometric_points[i], vec3( 0, 0, 1 ) );
-    //   // cout << GRID.geometric_points[i].z << endl;
+    // vec4 begin = vec4( 0, 0, 0, 1 );
+    // vec4 finish = matrix * begin;
+    // vector<vec2> dist_ext;
+    // Extinction3D( begin,
+    //               finish,
+    //               GRID,
+    //               dist_ext );
+    // for( int i=0; i<items.size(); i++ ){
+    //   PositionShader( screen, items[i].min, purple );
+    //   // DrawBox( screen, items[i].min, items[i].max, purple );
     // }
-    // vector<ivec2> hit_indexes;
-    // vector<float> distances;
-    Vertex v1, v2;
-    v1.position = matrix * light_position;
-    // v1.position.x += 0.05;
-    v2.position = matrix * vec4( -0.5, 0.7, 0, 1.0f );
-
-    vector<vec2> dist_ext;
-    Extinction3D( screen, v1.position,  v2.position, GRID, dist_ext );
-    DrawLine( screen, v1, v2, vec3( 1, 1, 0 ) );
-    for( int i=0; i<dist_ext.size(); i++ ){
-      vec4 point = v1.position + ( dist_ext[i].x * glm::normalize( v2.position - v1.position ) );
-      PositionShader( screen, point, vec3( 1, 0, 0 ) );
-    }
-    // DrawLine( screen, v1, v2, vec3( 0, 0, 1 ) );
-    // for( int i=0; i<hit_indexes.size(); i++ ){
-    //   int index = ( ( hit_indexes[i].y ) * ( GRID.side_points ) ) + hit_indexes[i].x;
-    //   PositionShader( screen, GRID.geometric_points[index], vec3( 0, 1, 0 ) );
-    //   vec3 intersection_point = ( glm::normalize( vec3( v2.position ) - vec3( v1.position ) ) *
-    //                             distances[i] ) + vec3( v1.position );
-    //   PositionShader( screen, vec4( intersection_point, 1.0f ), vec3( 0, 1, 0 ) );
-    //   cout << distances[i] << endl;
-    // }
-    // PositionShader( screen, GRID.geometric_points[0], vec3( 1, 0, 1 ) );
     SDL_Renderframe(screen);
   }
 }
@@ -369,8 +362,27 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
     if( bound1 && bound2 ){
       double t_bc       = glm::length( point_beam - glm::dvec3( s.orig_start ) );
       double t_cb       = view_distance;
-      transmitted       = Transmittance( t_bc, extinction ) *
-                          Transmittance( t_cb, extinction );
+      if( HETEROGENEOUS ){
+        glm::length( b - glm::dvec3( s.orig_start ) );
+        // float proportion = ( t_bc - glm::length( a - glm::dvec3( s.orig_start ) ) ) / t_bc;
+        float proportion = ( t_bc - glm::length( a - glm::dvec3( s.orig_start ) ) ) /
+                           ( glm::length( b - glm::dvec3( s.orig_start ) ) -
+                             glm::length( a - glm::dvec3( s.orig_start ) ) );
+        float additional = s.s_ext + ( ( s.e_ext - s.s_ext ) * proportion );
+
+        float beam_extinction = s.c_ext + ( ( additional - s.c_ext ) / ( s.seg_id + 1 ) );
+
+        vector<vec2> dist_ext;
+        float view_extinction = Extinction3D( vec4( 0, 0, 0, 1 ),
+                                              vec4( 0, 0, 0, 1 ) + ( dir * (float) t_cb ),
+                                              GRID,
+                                              dist_ext );
+        transmitted       = Transmittance( t_bc, beam_extinction ) *
+                            Transmittance( t_cb, view_extinction );
+      } else {
+        transmitted       = Transmittance( t_bc, extinction ) *
+                            Transmittance( t_cb, extinction );
+      }
 
       double cos_theta  = glm::dot( ab, cd );
       double sin_theta  = sqrt( 1 - pow( cos_theta, 2 ) );
