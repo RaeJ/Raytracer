@@ -151,6 +151,10 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      } else {
        mean = extinction_c;
      }
+
+
+
+
      beam_seg.c_ext  = mean;
      beam_seg.seg_id = current_step;
 
@@ -239,7 +243,7 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
        current_step++;
 
-       step           = dist_ext[current_step].x - dist_ext[current_step-1].x;
+       step           = dist_ext[current_step].x - step;
        beam_seg.e_ext = dist_ext[current_step].y;
      }
 

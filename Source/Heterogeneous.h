@@ -150,6 +150,10 @@ float FindAverageExtinction3D( const vec3& start, const vec3& direction,
     float right  = tr_ext + ( ( br_ext - tr_ext ) * proportion.y );
 
     float ext_i  = ( left + right ) * proportion.x;
+    if( ext_i  < 0 ){
+      cout << "proportion x: " << proportion.x << endl;
+      cout << "proportion y: " << proportion.y << endl;
+    }
     extinctions.push_back( ext_i );
 
     average_extinction += ext_i;

@@ -23,7 +23,7 @@
 #define FIXED_RADIUS true
 #define RADIUS 0.01f
 
-#define HETEROGENEOUS false
+#define HETEROGENEOUS true
 
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.0f

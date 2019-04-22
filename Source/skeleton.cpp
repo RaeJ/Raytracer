@@ -73,19 +73,9 @@ int main( int argc, char* argv[] )
   CreateSurface( 37, -3.0, 1.006 );
   mat4 matrix;  TransformationMatrix( matrix );
   root_matrix = matrix;
-  float minimum = 10;
-  float maximum = -10;
-  // for( int i=0; i<GRID.geometric_points.size(); i++ ){
-  //   GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
-  //   if( GRID.geometric_points[i].z < minimum ){
-  //     cout << "Min: " << GRID.geometric_points[i].z << endl;
-  //     minimum = GRID.geometric_points[i].z;
-  //   }
-  //   if( GRID.geometric_points[i].z > maximum ){
-  //     cout << "Max: " << GRID.geometric_points[i].z << endl;
-  //     maximum = GRID.geometric_points[i].z;
-  //   }
-  // }
+  for( int i=0; i<GRID.geometric_points.size(); i++ ){
+    GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+  }
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -357,6 +347,7 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
         ( ( beam_distance <= glm::length( b - glm::dvec3( s.orig_start ) ) ) ) ){
       bound2 = true;
     }
+    float scattering = scattering_c;
 
 
     if( bound1 && bound2 ){
@@ -377,8 +368,15 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
                                               vec4( 0, 0, 0, 1 ) + ( dir * (float) t_cb ),
                                               GRID,
                                               dist_ext );
+        // if( beam_extinction < 0 || view_extinction < 0 ){
+        // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+        //   cout << "Beam extinction: " << beam_extinction << endl;
+        //   cout << "View extinction: " << view_extinction << endl;
+        // }
         transmitted       = Transmittance( t_bc, beam_extinction ) *
                             Transmittance( t_cb, view_extinction );
+
+        // scattering = ( beam_extinction / extinction_c ) * scattering_c;
       } else {
         transmitted       = Transmittance( t_bc, extinction ) *
                             Transmittance( t_cb, extinction );
@@ -386,8 +384,9 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
 
       double cos_theta  = glm::dot( ab, cd );
       double sin_theta  = sqrt( 1 - pow( cos_theta, 2 ) );
+      double rad        = scattering / s.radius;
 
-      return ( transmitted / sin_theta );
+      return ( transmitted * rad / sin_theta );
     } else {
       return 0;
     }
@@ -449,10 +448,9 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                                                 dir );
 
                   double phase_f  = 1 / ( 4 * PI );
-                  double rad      = scattering_c / seg.radius;
                   PhotonBeam beam = beams[ seg.id ];
 
-                  current        += beam.energy * phase_f * rad * _int;
+                  current        += beam.energy * phase_f * _int;
                 } else {
                   double _int     = Integral_721( seg,
                                                  intersect,
@@ -532,10 +530,9 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
                                                 dir );
 
                   double phase_f  = 1 / ( 4 * PI );
-                  double rad      = scattering_c / seg.radius;
                   PhotonBeam beam = beams[ seg.id ];
 
-                  current        += beam.energy * phase_f * rad * _int;
+                  current        += beam.energy * phase_f * _int;
                 } else {
                   double _int     = Integral_721( seg,
                                                  intersect,
