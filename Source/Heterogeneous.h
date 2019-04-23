@@ -153,6 +153,11 @@ float FindAverageExtinction3D( const vec3& start, const vec3& direction,
     if( ext_i  < 0 ){
       cout << "proportion x: " << proportion.x << endl;
       cout << "proportion y: " << proportion.y << endl;
+      cout << "left: " << left << endl;
+      cout << "right: " << right << endl;
+      cout << "tl_ext: " << tl_ext << endl;
+      cout << "bl_ext: " << bl_ext << endl;
+      ext_i = 0;
     }
     extinctions.push_back( ext_i );
 

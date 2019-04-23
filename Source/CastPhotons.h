@@ -259,8 +259,8 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
   vec4 max_point = vec4( -m, -m, m, 1 );
 
   vec4 origin    = matrix * light_position;
-  vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
-  // vec4 centre    = vec4( origin.x, origin.y + 1.5, origin.z, 1.0f );
+  // vec4 centre    = vec4( origin.x, origin.y + 0.5, origin.z, 1.0f );
+  vec4 centre    = vec4( origin.x, origin.y + 1.5, origin.z, 1.0f );
   // TODO: make this radius value useful
   float radius   = 0.05f;
 

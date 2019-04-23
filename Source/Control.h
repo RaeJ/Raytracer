@@ -20,10 +20,10 @@
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
 
-#define FIXED_RADIUS true
-#define RADIUS 0.01f
+#define FIXED_RADIUS false
+#define RADIUS 0.0075f
 
-#define HETEROGENEOUS true
+#define HETEROGENEOUS false
 
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.0f
@@ -39,7 +39,7 @@ using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.5,1);
 // vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
-vec3 light_power = 0.1f * vec3( 1, 1, 1 );
+vec3 light_power = 0.15f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 

@@ -8,6 +8,10 @@
 #include <math.h>
 #include "CastPhotons.h"
 #include "Analysis.h"
+#include <sstream>
+#include <iostream>
+#include <chrono>
+#include <ctime>
 
 /* ----------------------------------------------------------------------------*/
 /* STRUCTS                                                                     */
@@ -59,8 +63,46 @@ double Integral_73( PhotonSeg s,
                    CylIntersection i,
                    float extinction,
                    vec4 dir  );
+void ProduceStopMotion();
+void SingleRun();
+// void RecurseTree( Node* parent_node );
 
 // ------------------------------------------------------------------------- //
+
+// void RecurseTree( Node* parent_node ){
+//   PhotonSeg segments[2];
+//   segments[0] = parent_node->segments[0];
+//   segments[1] = parent_node->segments[1];
+//   for( int i = 0; i < 2; i++ ){
+//     PhotonSeg seg = segments[i];
+//     if( seg.id != -1 ){
+//       Vertex v1, v2;
+//       v1.position = seg.start;
+//       v2.position = seg.end;
+//       Pixel proj1; VertexShader( v1, proj1 );
+//       Pixel proj2; VertexShader( v2, proj2 );
+//
+//       int delta_x = abs( proj1.x - proj2.x );
+//       int delta_y = abs( proj1.y - proj2.y );
+//       int h = (int) sqrt( ( pow( delta_x, 2 ), pow( delta_y, 2 ) ) );
+//       int p_num = max( h, max( delta_x, delta_y ) ) + 1;
+//
+//       vector<Pixel> result( p_num );
+//
+//       Interpolate( proj1, proj2, result );
+//
+//       for( int j=0; j<result.size(); j++ ){
+//         pixels[result[j].x][result[j].y] += vec3(0.001,0,0.001);
+//       }
+//     }
+//   }
+//   if( parent_node -> left != NULL ){
+//     RecurseTree( parent_node -> left );
+//   }
+//   if( parent_node -> right != NULL ){
+//     RecurseTree( parent_node -> right );
+//   }
+// }
 
 int main( int argc, char* argv[] )
 {
@@ -69,8 +111,18 @@ int main( int argc, char* argv[] )
     RunAnalysis();
   }
 
+  LoadTestModel( triangles );
+
+  SingleRun();
+
+  // ProduceStopMotion();
+
+  return 0;
+}
+
+void SingleRun(){
   cout << "Creating grid" << endl;
-  CreateSurface( 37, -3.0, 1.006 );
+  CreateSurface( 37, -3.0, 0.002 );
   mat4 matrix;  TransformationMatrix( matrix );
   root_matrix = matrix;
   for( int i=0; i<GRID.geometric_points.size(); i++ ){
@@ -79,10 +131,6 @@ int main( int argc, char* argv[] )
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
-
-  LoadTestModel( triangles );
-
-
 
   cout << "Casting photons" << endl;
   root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
@@ -95,7 +143,6 @@ int main( int argc, char* argv[] )
   cout << "Calculating radiance" << endl;
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-  // Draw( screen, beams, items );
 
   while( Update() )
     {
@@ -104,9 +151,62 @@ int main( int argc, char* argv[] )
     }
 
   SDL_SaveImage( screen, "screenshot.bmp" );
-
   KillSDL(screen);
-  return 0;
+}
+
+void ProduceStopMotion(){
+  auto start = std::chrono::system_clock::now();
+
+  cout << "Creating grid" << endl;
+  CreateSurface( 37, -3.0, 0.002 );
+  mat4 matrix;  TransformationMatrix( matrix );
+  root_matrix = matrix;
+  for( int i=0; i<GRID.geometric_points.size(); i++ ){
+    GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+  }
+
+  vector<PhotonBeam> beams;
+  vector<PhotonSeg> items;
+
+  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+  BoundPhotonBeams( beams, items, triangles );
+  root = newNode( root_aabb );
+  BuildTree( root, items );
+
+  for( int i=4; i<100; i=i+2 ){
+    screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+
+    // beams.clear();
+    // items.clear();
+    // root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+    // BoundPhotonBeams( beams, items, triangles );
+    // root = newNode( root_aabb );
+    // BuildTree( root, items );
+
+    Draw( screen, beams, items );
+    SDL_Renderframe(screen);
+
+    auto end = std::chrono::system_clock::now();
+
+    std::chrono::duration<double> elapsed_seconds = end-start;
+
+    std::ostringstream oss;
+    oss << "screenshot_" << elapsed_seconds.count() << "_.bmp";
+    std::string filename = oss.str();
+
+    char *file = new char[filename.length() + 1];
+    std::strcpy(file, filename.c_str());
+
+    CreateSurface( 37, -3.0, i/1000 );
+    mat4 matrix;  TransformationMatrix( matrix );
+    root_matrix = matrix;
+    for( int i=0; i<GRID.geometric_points.size(); i++ ){
+      GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+    }
+
+    SDL_SaveImage( screen, file );
+    KillSDL(screen);
+  }
 }
 
 
@@ -164,6 +264,36 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     // for( int i=0; i<items.size(); i++ ){
     //   PositionShader( screen, items[i].min, purple );
     //   // DrawBox( screen, items[i].min, items[i].max, purple );
+    // }
+    // vec3 pixels[SCREEN_WIDTH][SCREEN_HEIGHT] = {};
+    //
+    // for( int i=0; i<beams.size(); i++ ){
+    //   Vertex v1, v2;
+    //   v1.position = beams[i].start;
+    //   v2.position = beams[i].end;
+    //   Pixel proj1; VertexShader( v1, proj1 );
+    //   Pixel proj2; VertexShader( v2, proj2 );
+    //
+    //   int delta_x = abs( proj1.x - proj2.x );
+    //   int delta_y = abs( proj1.y - proj2.y );
+    //   int h = (int) sqrt( ( pow( delta_x, 2 ), pow( delta_y, 2 ) ) );
+    //   int p_num = max( h, max( delta_x, delta_y ) ) + 1;
+    //
+    //   vector<Pixel> result( p_num );
+    //
+    //   Interpolate( proj1, proj2, result );
+    //
+    //   for( int j=0; j<result.size(); j++ ){
+    //     pixels[result[j].x][result[j].y] += vec3(0.08,0,0.08);
+    //   }
+    //   // DrawBeam( screen, beams[i], vec3( 0.1, 0, 0.1 ) );
+    //   // DrawBox( screen, items[i].min, items[i].max, purple );
+    // }
+    // RecurseTree( root );
+    // for( int i=0; i<SCREEN_WIDTH; i++ ){
+    //   for( int j=0; j<SCREEN_HEIGHT; j++ ){
+    //     PixelShader( screen, i, j, pixels[i][j] );
+    //   }
     // }
     SDL_Renderframe(screen);
   }
@@ -395,184 +525,69 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
   }
 }
 
-
-// TODO: Check if the limit is working correctly
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& limit, Node* parent,
                    glm::dvec3& current, vector<PhotonBeam>& beams ){
   vec4 hit;
-
-  Node* left     = parent->left;
-  Node* right    = parent->right;
-
-  mat4 matrix;  TransformationMatrix( matrix );
   float max_distance  = glm::length( limit.position - start );
-
-  if( left != NULL){
-    AABB box_left  = left->aabb;
-    // DrawBoundingBox( screen, box_left );
-    if( HitBoundingBox( box_left, start, dir, hit ) ){
-      // Pixel h; Vertex vh; vh.position = hit;
-      // VertexShader( vh, h );
-      // PixelShader( screen, h.x, h.y, vec3(1,1,1) );
-      float hit_distance = glm::length( hit - start );
-      if( hit_distance <= max_distance ){
-        PhotonSeg segments[2];
-        segments[0] = left->segments[0];
-        segments[1] = left->segments[1];
-        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg seg = segments[i];
-          if( seg.id != -1 ){
-            CylIntersection intersect;
-            if( seg.ada_width ){
-              // cout << seg.radius << endl;
-              if( HitCone( start, dir, seg, intersect ) ){
-                if( intersect.valid ){
-
-                  double _int     = Integral_721_ada( seg,
-                                                     intersect,
-                                                     extinction_c,
-                                                     dir );
-
-                  double phase_f  = 1 / ( 4 * PI );
-
-                  PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * _int;
-                }
-              }
-            } else if( HitCylinder( start, dir, seg, intersect ) ){
+  AABB box = parent->aabb;
+  if( HitBoundingBox( box, start, dir, hit ) ){
+    float hit_distance = glm::length( hit - start );
+    if( hit_distance <= max_distance ){
+      PhotonSeg segments[2];
+      segments[0] = parent->segments[0];
+      segments[1] = parent->segments[1];
+      for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
+        PhotonSeg seg = segments[i];
+        if( seg.id != -1 ){
+          CylIntersection intersect;
+          if( seg.ada_width ){
+            if( HitCone( start, dir, seg, intersect ) ){
               if( intersect.valid ){
-                if( ONE_DIMENSIONAL ){
-                  double _int     = Integral_73( seg,
-                                                intersect,
-                                                extinction_c,
-                                                dir );
 
-                  double phase_f  = 1 / ( 4 * PI );
-                  PhotonBeam beam = beams[ seg.id ];
+                double _int     = Integral_721_ada( seg,
+                                                   intersect,
+                                                   extinction_c,
+                                                   dir );
 
-                  current        += beam.energy * phase_f * _int;
-                } else {
-                  double _int     = Integral_721( seg,
-                                                 intersect,
-                                                 extinction_c,
-                                                 dir );
+                double phase_f  = 1 / ( 4 * PI );
 
-                  double phase_f  = 1 / ( 4 * PI );
-                  double rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
+                PhotonBeam beam = beams[ seg.id ];
+                current        += beam.energy * phase_f * _int;
+              }
+            }
+          } else if( HitCylinder( start, dir, seg, intersect ) ){
+            if( intersect.valid ){
+              if( ONE_DIMENSIONAL ){
+                double _int     = Integral_73( seg,
+                                              intersect,
+                                              extinction_c,
+                                              dir );
 
-                  PhotonBeam beam = beams[ seg.id ];
-                  // current        += beam.energy * phase_f * rad * _int;
+                double phase_f  = 1 / ( 4 * PI );
+                PhotonBeam beam = beams[ seg.id ];
 
-                  float error_1   = glm::length( intersect.entry_point -
-	                                               vec3( limit.position ) );
-	                float error_2   = glm::length( intersect.exit_point -
-	                                               vec3( limit.position ) );
-	                float margin = 0.0005f;
+                current        += beam.energy * phase_f * _int;
+              } else {
+                double _int     = Integral_721( seg,
+                                               intersect,
+                                               extinction_c,
+                                               dir );
 
-                  // double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
+                double phase_f  = 1 / ( 4 * PI );
+                double rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
 
-	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
-	                ( error_2 <= ( seg.radius + margin ) ) ) &&
-	                  beam.absorbed ){
-	                  // double transmitted = Transmittance( transmitted_distance, extinction_c );
-                    // double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
-                                        // , extinction_c );
-                    current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
-	                } else {
-	                  current        += beam.energy * phase_f * rad * _int;
-	                }
-                }
+                PhotonBeam beam = beams[ seg.id ];
+                current        += beam.energy * phase_f * rad * _int;
               }
             }
           }
-        }
-        if( left->left != NULL || left->right != NULL ){
-          BeamRadiance( screen, start, dir, limit, left, current, beams );
         }
       }
-    }
-  }
-
-  if( right != NULL ){
-    AABB box_right = right->aabb;
-    if( HitBoundingBox( box_right, start, dir, hit ) ){
-      float hit_distance = glm::length( hit - start );
-      if( hit_distance < max_distance ){
-        // Hits the right box at some point
-        PhotonSeg segments[2];
-        segments[0] = right->segments[0];
-        segments[1] = right->segments[1];
-        for( unsigned int i = 0; i < sizeof(segments)/sizeof(segments[0]); i++ ){
-          PhotonSeg seg = segments[i];
-          if( seg.id != -1 ){
-            CylIntersection intersect;
-            if( seg.ada_width ){
-              if( HitCone( start, dir, seg, intersect ) ){
-                if( intersect.valid ){
-
-                  double _int     = Integral_721_ada( seg,
-                                                     intersect,
-                                                     extinction_c,
-                                                     dir );
-
-                  double phase_f  = 1 / ( 4 * PI );
-
-                  PhotonBeam beam = beams[ seg.id ];
-                  current        += beam.energy * phase_f * _int;
-                }
-              }
-            } else if( HitCylinder( start, dir, seg, intersect ) ){
-              if( intersect.valid ){
-                if( ONE_DIMENSIONAL ){
-                  double _int     = Integral_73( seg,
-                                                intersect,
-                                                extinction_c,
-                                                dir );
-
-                  double phase_f  = 1 / ( 4 * PI );
-                  PhotonBeam beam = beams[ seg.id ];
-
-                  current        += beam.energy * phase_f * _int;
-                } else {
-                  double _int     = Integral_721( seg,
-                                                 intersect,
-                                                 extinction_c,
-                                                 dir );
-
-                  double phase_f  = 1 / ( 4 * PI );
-                  double rad      = scattering_c / ( PI * pow( seg.radius, 2 ) );
-
-                  PhotonBeam beam = beams[ seg.id ];
-                  // current        += beam.energy * phase_f * rad * _int;
-
-                  float error_1   = glm::length( intersect.entry_point -
-	                                               vec3( limit.position ) );
-	                float error_2   = glm::length( intersect.exit_point -
-	                                               vec3( limit.position ) );
-	                float margin = 0.001f;
-
-                  // double transmitted_distance = glm::length( vec3( beam.end ) - vec3( beam.start ) );
-
-	                if( ( ( error_1 <= ( seg.radius + margin ) ) ||
-	                ( error_2 <= ( seg.radius + margin ) ) ) &&
-	                  beam.absorbed ){
-                      // double transmitted = Transmittance( transmitted_distance, extinction_c );
-                      // double to_camera   = Transmittance( glm::length( vec3( intersect.entry_point ) )
-                      //                     , extinction_c );
-                      // cout << "Transmitted: " << transmitted << endl;
-                      // cout << "to camera: " << to_camera << endl;
-                      current        +=  ( beam.energy - beam.energy * _int ) * phase_f * rad;
-	                } else {
-	                  current        += beam.energy * phase_f * rad * _int;
-	                }
-                }
-              }
-            }
-          }
-        }
-        if( right->left != NULL || right->right != NULL ){
-          BeamRadiance( screen, start, dir, limit, right, current, beams );
-        }
+      if( parent->left != NULL ){
+        BeamRadiance( screen, start, dir, limit, parent->left, current, beams );
+      }
+      if( parent->right != NULL ){
+        BeamRadiance( screen, start, dir, limit, parent->right, current, beams );
       }
     }
   }
