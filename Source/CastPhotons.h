@@ -568,13 +568,16 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
    }
    return;
  }
+ bool lost = false;
+ if( child.size() == 5 ) lost = true;
+
  vec4 diff     = abs( parent->aabb.max - parent->aabb.min );
  vec4 mid      = parent->aabb.mid;
 
  vector<PhotonSeg> l;
  vector<PhotonSeg> r;
+ vector<PhotonSeg> leftovers;
 
- // TODO: Note, if the photon segment lies on a boundary it is ignored
  bool same = true;
  int dim   = -1;
  if( ( diff.x > diff.y ) && ( diff.x > diff.z ) ){
@@ -586,13 +589,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }  else if( box.mid.x > mid.x ) {
        r.push_back( box );
        same = false;
-     }
-     else {
-       if( i % 2 == 0 ){
-         r.push_back( box );
-       } else {
-         l.push_back( box );
-       }
+     } else if( !same ){
+       leftovers.push_back( box );
      }
    }
    if( same ) dim = 0;
@@ -605,12 +603,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }  else if( box.mid.y > mid.y ){
        r.push_back( box );
        same = false;
-     } else {
-       if( i % 2 == 0 ){
-         r.push_back( box );
-       } else {
-         l.push_back( box );
-       }
+     } else if( !same ){
+       leftovers.push_back( box );
      }
    }
    if( same ) dim = 1;
@@ -623,12 +617,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      } else if( box.mid.z < mid.z ){
        r.push_back( box );
        same = false;
-     } else {
-       if( i % 2 == 0 ){
-         r.push_back( box );
-       } else {
-         l.push_back( box );
-       }
+     } else if( !same ){
+       leftovers.push_back( box );
      }
    }
    if( same ) dim = 2;
@@ -647,12 +637,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
        }
        if( same ){
@@ -682,12 +668,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
        }
        if( same ){
@@ -719,12 +701,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
        }
        if( same ){
@@ -754,12 +732,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
        }
        if( same ){
@@ -791,12 +765,8 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
        }
        if( same ){
@@ -826,14 +796,9 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
-         } else {
-           if( i % 2 == 0 ){
-             r.push_back( box );
-           } else {
-             l.push_back( box );
-           }
+         } else if( !same ){
+           leftovers.push_back( box );
          }
-
        }
        if( same ){
          l.clear();
@@ -856,6 +821,15 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }
    }
  }
+
+for( int i = 0; i<leftovers.size(); i++ ){
+  if( uniform( generator ) < 0.5 ){
+    l.push_back( leftovers[i] );
+  } else {
+    r.push_back( leftovers[i] );
+  }
+}
+
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();
  if( l_size != 0 ){

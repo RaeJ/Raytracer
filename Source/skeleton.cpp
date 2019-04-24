@@ -66,25 +66,25 @@ double Integral_73( PhotonSeg s,
                    vec4 dir  );
 void ProduceStopMotion();
 void SingleRun();
-void RecurseTree( screen* screen, Node* parent_node );
+void RecurseTree( screen* screen, Node* parent_node, vec3 colour );
 
 // ------------------------------------------------------------------------- //
 
-void RecurseTree( screen* screen, Node* parent_node ){
+void RecurseTree( screen* screen, Node* parent_node, vec3 colour ){
   PhotonSeg segments[2];
   segments[0] = parent_node->segments[0];
   segments[1] = parent_node->segments[1];
   for( int i = 0; i < 2; i++ ){
     PhotonSeg seg = segments[i];
     if( seg.id != -1 ){
-      DrawBox( screen, seg.min, seg.max, vec3(1,1,1) );
+      DrawBox( screen, seg.min, seg.max, colour );
     }
   }
   if( parent_node -> left != NULL ){
-    RecurseTree( screen, parent_node -> left );
+    RecurseTree( screen, parent_node -> left, colour );
   }
   if( parent_node -> right != NULL ){
-    RecurseTree( screen, parent_node -> right );
+    RecurseTree( screen, parent_node -> right, colour );
   }
 }
 
@@ -137,9 +137,12 @@ void SingleRun(){
       // // }
       // for( int i=0; i<items.size(); i++ ){
       //   // PositionShader( screen, items[i].min, purple );
-      //   DrawBox( screen, items[i].min, items[i].max, purple );
+      //   DrawBox( screen, items[i].min, items[i].max, vec3(0,1,0) );
       // }
-      // RecurseTree( screen, root->left->right );
+      // RecurseTree( screen, root, vec3( 1, 1, 0 ) );
+      // RecurseTree( screen, root->left, vec3( 1, 0, 0 ) );
+      // RecurseTree( screen, root->left->right, vec3( 1, 1, 1 ) );
+      // // RecurseTree( screen, root->left->right, vec3( 0, 0, 1 ) );
 
       SDL_Renderframe(screen);
     }
