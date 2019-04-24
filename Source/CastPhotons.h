@@ -110,8 +110,7 @@ void DrawTree( Node* parent, screen* screen );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, const vector<Triangle>& triangles ){
  vec3 x_dir     = glm::normalize( vec3( 1, 0, 0 ) );
  vec3 y_dir     = glm::normalize( vec3( 0, 1, 0 ) );
-
- float bound    = sqrt( 2 ) / 2;
+ vec3 z_dir     = glm::normalize( vec3( 0, 0, 1 ) );
 
  for( int i=0; i<beams.size(); i++ ){
    PhotonBeam b = beams[i];
@@ -124,10 +123,11 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float length = glm::length( vec3( end ) - vec3( start ) );
    float j=0;
 
-   float cos_x  = glm::dot( abs( dir ), x_dir );
-   float cos_y  = glm::dot( abs( dir ), y_dir );
+   float theta_x = fmin( acos( glm::dot( dir, x_dir ) ), acos( glm::dot( dir, -x_dir ) ) );
+   float theta_y = fmin( acos( glm::dot( dir, y_dir ) ), acos( glm::dot( dir, -y_dir ) ) );
+   float theta_z = fmin( acos( glm::dot( dir, z_dir ) ), acos( glm::dot( dir, -z_dir ) ) );
 
-   float step   = 0.02;
+   float step   = 0.2;
 
    vector<vec2> dist_ext;
    int current_step = 1;
@@ -152,13 +152,8 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        mean = extinction_c;
      }
 
-
-
-
      beam_seg.c_ext  = mean;
      beam_seg.seg_id = current_step;
-
-
 
      if( length <= glm::length( vec3( next ) - vec3( start ) ) ){
        j = glm::length( length );
@@ -168,12 +163,10 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        beam_seg.end = vec4( next.x, next.y, next.z, 1.0f );
      }
 
-
      prior = vec3( beam_seg.end );
 
      beam_seg.orig_start = start;
      beam_seg.orig_start.w = 1.0f;
-
 
      if( b.ada_width ){
        vec3 omega_u        = glm::normalize( vec3( b.omega_u ) );
@@ -189,17 +182,6 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      beam_seg.id     = i;
 
-     vec3 component  = vec3( 0, 0, 0 );
-     if( cos_x < cos_y ){
-       component.x = 0;
-       component.y = beam_seg.radius / bound;
-       component.z = beam_seg.radius / bound;
-     } else {
-       component.x = beam_seg.radius / bound;
-       component.y = 0;
-       component.z = beam_seg.radius / bound;
-     }
-
      beam_seg.min    = vec4( ( fmin( beam_seg.start.x, beam_seg.end.x) ),
                              ( fmin( beam_seg.start.y, beam_seg.end.y) ),
                              ( fmax( beam_seg.start.z, beam_seg.end.z) ), 1.0f );
@@ -208,31 +190,38 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
                              ( fmin( beam_seg.start.z, beam_seg.end.z) ), 1.0f );
 
      if( length > 0.001 ){
-       if( !( beam_seg.start.y == start.y ) ){
-         beam_seg.min  = vec4( beam_seg.min.x - component.x,
-                               beam_seg.min.y - component.y,
-                               beam_seg.min.z + component.z, 1.0f );
-       }
-       if( !( ( vec3( beam_seg.end ) == vec3( end ) ) ) ){
-         beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                               beam_seg.max.y + component.y,
-                               beam_seg.max.z - component.z, 1.0f );
-       } else if( b.index_hit != -1 ){
-         Triangle tri = triangles[ b.index_hit ];
-         vec4 tri_normal = abs( tri.normal );
-         if( tri_normal.x > ( tri_normal.y || tri_normal.z ) ){
-           beam_seg.max  = vec4( beam_seg.max.x,
-                                 beam_seg.max.y + component.y,
-                                 beam_seg.max.z - component.z, 1.0f );
-         } else if ( tri_normal.y > ( tri_normal.x || tri_normal.z ) ){
-           beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                                 beam_seg.max.y,
-                                 beam_seg.max.z - component.z, 1.0f );
-         } else if ( tri_normal.z > ( tri_normal.x || tri_normal.y ) ){
-           beam_seg.max  = vec4( beam_seg.max.x + component.x,
-                                 beam_seg.max.y + component.y,
-                                 beam_seg.max.z, 1.0f );
-         }
+       float hypotenuse = 0;
+       float adj = 0;
+       if( theta_x < theta_y && theta_x < theta_z ){
+         hypotenuse = beam_seg.radius / sin( theta_x );
+         adj = beam_seg.radius / cos( theta_x );
+         float height = adj * sin( theta_x );
+         beam_seg.min  = vec4( beam_seg.min.x - height,
+                               beam_seg.min.y - hypotenuse,
+                               beam_seg.min.z + hypotenuse, 1.0f );
+         beam_seg.max  = vec4( beam_seg.max.x + height,
+                               beam_seg.max.y + hypotenuse,
+                               beam_seg.max.z - hypotenuse, 1.0f );
+       } else if( theta_y < theta_z ){
+         hypotenuse = beam_seg.radius / sin( theta_y );
+         adj = beam_seg.radius / cos( theta_y );
+         float height = adj * sin( theta_y );
+         beam_seg.min  = vec4( beam_seg.min.x - hypotenuse,
+                               beam_seg.min.y - height,
+                               beam_seg.min.z + hypotenuse, 1.0f );
+         beam_seg.max  = vec4( beam_seg.max.x + hypotenuse,
+                               beam_seg.max.y + height,
+                               beam_seg.max.z - hypotenuse, 1.0f );
+       } else {
+         hypotenuse = beam_seg.radius / sin( theta_z );
+         adj = beam_seg.radius / cos( theta_z );
+         float height = adj * sin( theta_z );
+         beam_seg.min  = vec4( beam_seg.min.x - hypotenuse,
+                               beam_seg.min.y - hypotenuse,
+                               beam_seg.min.z + height, 1.0f );
+         beam_seg.max  = vec4( beam_seg.max.x + hypotenuse,
+                               beam_seg.max.y + hypotenuse,
+                               beam_seg.max.z - height, 1.0f );
        }
 
      }
@@ -598,9 +587,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
        r.push_back( box );
        same = false;
      }
-     // else {
-     //   parent->segments[i%2] = child[i];
-     // }
+     else {
+       if( i % 2 == 0 ){
+         r.push_back( box );
+       } else {
+         l.push_back( box );
+       }
+     }
    }
    if( same ) dim = 0;
  } else if( diff.y > diff.z ){
@@ -612,12 +605,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      }  else if( box.mid.y > mid.y ){
        r.push_back( box );
        same = false;
+     } else {
+       if( i % 2 == 0 ){
+         r.push_back( box );
+       } else {
+         l.push_back( box );
+       }
      }
-     // else {
-     //   // TODO: what to do here?
-     //   parent->segments[i%2] = child[i];
-     //   // segments.push_back( child[i] );
-     // }
    }
    if( same ) dim = 1;
  } else {
@@ -629,12 +623,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
      } else if( box.mid.z < mid.z ){
        r.push_back( box );
        same = false;
+     } else {
+       if( i % 2 == 0 ){
+         r.push_back( box );
+       } else {
+         l.push_back( box );
+       }
      }
-     // else {
-     //   // TODO: what to do here?
-     //   parent->segments[i%2] = child[i];
-     //   // segments.push_back( child[i] );
-     // }
    }
    if( same ) dim = 2;
  }
@@ -652,12 +647,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   // TODO: what to do here?
-           // parent->segments[i%2] = child[i];
-         //   // segments.push_back( child[i] );
-         // }
        }
        if( same ){
          l.clear();
@@ -686,13 +682,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   // TODO: what to do here?
-         //   parent->segments[i%2] = child[i];
-         //   // segments.push_back( child[i] );
-         // }
-
        }
        if( same ){
          l.clear();
@@ -723,10 +719,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   parent->segments[i%2] = child[i];
-         // }
        }
        if( same ){
          l.clear();
@@ -755,12 +754,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          } else if( box.mid.z < mid.z ){
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   // TODO: what to do here?
-         //   parent->segments[i%2] = child[i];
-         //   // segments.push_back( child[i] );
-         // }
        }
        if( same ){
          l.clear();
@@ -791,10 +791,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.x > mid.x ) {
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   parent->segments[i%2] = child[i];
-         // }
        }
        if( same ){
          l.clear();
@@ -823,12 +826,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child ){
          }  else if( box.mid.y > mid.y ){
            r.push_back( box );
            same = false;
+         } else {
+           if( i % 2 == 0 ){
+             r.push_back( box );
+           } else {
+             l.push_back( box );
+           }
          }
-         // else {
-         //   // TODO: what to do here?
-         //   parent->segments[i%2] = child[i];
-         //   // segments.push_back( child[i] );
-         // }
 
        }
        if( same ){

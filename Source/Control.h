@@ -6,7 +6,7 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 5000
+#define PHOTON_NUMBER 2
 #define BOUNCES 0
 #define ADAPTIVE false
 
@@ -20,8 +20,8 @@
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
 
-#define FIXED_RADIUS false
-#define RADIUS 0.0075f
+#define FIXED_RADIUS true
+#define RADIUS 0.05f
 
 #define HETEROGENEOUS false
 
@@ -39,9 +39,9 @@ using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.5,1);
 // vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
-vec3 light_power = 0.15f * vec3( 1, 1, 1 );
+// vec3 light_power = 1.5f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
-// vec3 light_power = 20.1f * vec3( 1, 1, 1 );
+vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
 float absorption_c = 0.035;
 float scattering_c = 0.005;

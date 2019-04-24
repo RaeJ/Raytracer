@@ -78,7 +78,7 @@ mat3 findRotationMatrix( vec3 current_dir,
                          vec3 wanted_dir );
 
 bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
-  const int DIMS = 3; int RIGHT=0; int LEFT=1; int MIDDLE=2;
+  const int DIMS = 3, RIGHT=0, LEFT=1, MIDDLE=2;
   int quadrant[DIMS];
   bool inside = true;
   float min_b[DIMS] = { box.min.x, box.min.y, box.max.z };
@@ -130,7 +130,6 @@ bool HitBoundingBox( AABB box, vec4 start, vec4 dir, vec4& hit ){
     if ( largest != i ){
       position[i] = origin[i] + ( distances[largest] * direction[i] );
       if (position[i] < min_b[i] || position[i] > max_b[i]){
-
 				return false;
       }
     } else {

@@ -21,6 +21,7 @@
 /* GLOBAL VARIABLES                                                            */
 
 vector<Triangle> triangles;
+vector<AABB> boxes_hit;
 
 vec3 theta( 0.0, 0.0, 0.0 );
 vec3 indirect_light = 0.5f*vec3( 1, 1, 1 );
@@ -65,44 +66,27 @@ double Integral_73( PhotonSeg s,
                    vec4 dir  );
 void ProduceStopMotion();
 void SingleRun();
-// void RecurseTree( Node* parent_node );
+void RecurseTree( screen* screen, Node* parent_node );
 
 // ------------------------------------------------------------------------- //
 
-// void RecurseTree( Node* parent_node ){
-//   PhotonSeg segments[2];
-//   segments[0] = parent_node->segments[0];
-//   segments[1] = parent_node->segments[1];
-//   for( int i = 0; i < 2; i++ ){
-//     PhotonSeg seg = segments[i];
-//     if( seg.id != -1 ){
-//       Vertex v1, v2;
-//       v1.position = seg.start;
-//       v2.position = seg.end;
-//       Pixel proj1; VertexShader( v1, proj1 );
-//       Pixel proj2; VertexShader( v2, proj2 );
-//
-//       int delta_x = abs( proj1.x - proj2.x );
-//       int delta_y = abs( proj1.y - proj2.y );
-//       int h = (int) sqrt( ( pow( delta_x, 2 ), pow( delta_y, 2 ) ) );
-//       int p_num = max( h, max( delta_x, delta_y ) ) + 1;
-//
-//       vector<Pixel> result( p_num );
-//
-//       Interpolate( proj1, proj2, result );
-//
-//       for( int j=0; j<result.size(); j++ ){
-//         pixels[result[j].x][result[j].y] += vec3(0.001,0,0.001);
-//       }
-//     }
-//   }
-//   if( parent_node -> left != NULL ){
-//     RecurseTree( parent_node -> left );
-//   }
-//   if( parent_node -> right != NULL ){
-//     RecurseTree( parent_node -> right );
-//   }
-// }
+void RecurseTree( screen* screen, Node* parent_node ){
+  PhotonSeg segments[2];
+  segments[0] = parent_node->segments[0];
+  segments[1] = parent_node->segments[1];
+  for( int i = 0; i < 2; i++ ){
+    PhotonSeg seg = segments[i];
+    if( seg.id != -1 ){
+      DrawBox( screen, seg.min, seg.max, vec3(1,1,1) );
+    }
+  }
+  if( parent_node -> left != NULL ){
+    RecurseTree( screen, parent_node -> left );
+  }
+  if( parent_node -> right != NULL ){
+    RecurseTree( screen, parent_node -> right );
+  }
+}
 
 int main( int argc, char* argv[] )
 {
@@ -147,6 +131,16 @@ void SingleRun(){
   while( Update() )
     {
       Draw( screen, beams, items );
+      // // for( int i=0; i<items.size(); i++ ){
+      // //   // PositionShader( screen, items[i].min, purple );
+      // //   DrawBox( screen, items[i].min, items[i].max, vec3(1,1,1) );
+      // // }
+      // for( int i=0; i<items.size(); i++ ){
+      //   // PositionShader( screen, items[i].min, purple );
+      //   DrawBox( screen, items[i].min, items[i].max, purple );
+      // }
+      // RecurseTree( screen, root->left->right );
+
       SDL_Renderframe(screen);
     }
 
@@ -261,10 +255,6 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     //               finish,
     //               GRID,
     //               dist_ext );
-    // for( int i=0; i<items.size(); i++ ){
-    //   PositionShader( screen, items[i].min, purple );
-    //   // DrawBox( screen, items[i].min, items[i].max, purple );
-    // }
     // vec3 pixels[SCREEN_WIDTH][SCREEN_HEIGHT] = {};
     //
     // for( int i=0; i<beams.size(); i++ ){
@@ -531,6 +521,8 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
   float max_distance  = glm::length( limit.position - start );
   AABB box = parent->aabb;
   if( HitBoundingBox( box, start, dir, hit ) ){
+    boxes_hit.push_back( box );
+    // PositionShader( screen, hit, vec3( 1, 0, 1 ) );
     float hit_distance = glm::length( hit - start );
     if( hit_distance <= max_distance ){
       PhotonSeg segments[2];
