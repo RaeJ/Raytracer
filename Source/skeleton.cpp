@@ -181,8 +181,14 @@ void ProduceStopMotion(){
   root = newNode( root_aabb );
   BuildTree( root, items );
 
+  int begin  = 16;
+  int finish = 24;
+  for( int i = begin; i<finish; i++ ){
+    cout << ".";
+  }
+  cout << endl;
 
-  for( int i=16; i<20; i++ ){
+  for( int i=begin; i<finish; i++ ){
     screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
     Draw( screen, beams_const, items );
@@ -200,6 +206,8 @@ void ProduceStopMotion(){
 
     SDL_SaveImage( screen, file );
     KillSDL(screen);
+
+    cout << ".";
 
     beams_scattered.clear();
     items.clear();
