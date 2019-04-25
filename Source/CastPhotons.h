@@ -71,7 +71,8 @@ std::normal_distribution<double> normal(0.0, 0.25);
 // FUNCTIONS
 
 AABB CastPhotonBeams( int number,
-                      vector<PhotonBeam>& beams,
+                      vector<PhotonBeam>& beams_const,
+                      vector<PhotonBeam>& beams_scattered,
                       const mat4& matrix,
                       const vector<Triangle>& triangles );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
@@ -83,12 +84,18 @@ void CastBeam( int bounce,
                vec4 direction,
                vec4& min_point,
                vec4& max_point,
-               vector<PhotonBeam>& beams,
+               vector<PhotonBeam>& beams_const,
+               vector<PhotonBeam>& beams_scattered,
                float radius,
                const vector<Triangle>& triangles,
                const mat4& matrix,
                PhotonBeam& b
              );
+AABB RecastPhotonBeams( vector<PhotonBeam>& beams_const,
+                        vector<PhotonBeam>& beams_scattered,
+                        const mat4& matrix,
+                        const vector<Triangle>& triangles );
+
 bool intersectPlane( const vec3& n,
                     const vec3& p0,
                     const vec3& l0,
@@ -255,7 +262,30 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
  }
 }
 
-AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
+AABB RecastPhotonBeams( vector<PhotonBeam>& beams_const,
+                        vector<PhotonBeam>& beams_scattered,
+                        const mat4& matrix,
+                        const vector<Triangle>& triangles ){
+  vec4 min_point = vec4( m, m, -m, 1 );
+  vec4 max_point = vec4( -m, -m, m, 1 );
+
+  for( int i=0; i<beams_const.size(); i++ ){
+    PhotonBeam beam = beams_const[i];
+    vec4 direction = vec4( glm::normalize( vec3( beam.end ) - vec3( beam.start ) ), 1.0f );
+    CastBeam( 0, beam.energy, beam.start, direction, min_point, max_point,
+              beams_const, beams_scattered, beam.radius, triangles, matrix, beam );
+  }
+
+  AABB root;
+  root.min = min_point;
+  root.max = max_point;
+  root.mid = ( min_point + max_point ) / 2.0f;
+
+  return root;
+}
+
+AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams_const,
+                      vector<PhotonBeam>& beams_scattered,
                       const mat4& matrix, const vector<Triangle>& triangles ){
 
   vec4 min_point = vec4( m, m, -m, 1 );
@@ -270,7 +300,6 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
   vec3 energy    = light_power;
 
   PhotonBeam beam;
-
 
   for( int i=0; i<number; i++ ){
     vec4 direction = FindDirection( origin, centre, radius );
@@ -309,7 +338,8 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
     vec4 start     = origin + displace;
 
     CastBeam( 0, energy, start, direction, min_point, max_point,
-              beams, r, triangles, matrix, beam );
+              beams_const, beams_scattered, r, triangles, matrix, beam );
+
   }
 
   // for (double phi = 0.; phi < 2*PI; phi += PI/13.) // Azimuth [0, 2PI]
@@ -335,7 +365,8 @@ AABB CastPhotonBeams( int number, vector<PhotonBeam>& beams,
 }
 
 void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
-               vec4& min_point, vec4& max_point, vector<PhotonBeam>& beams,
+               vec4& min_point, vec4& max_point,
+               vector<PhotonBeam>& add_to, vector<PhotonBeam>& other,
                float radius, const vector<Triangle>& triangles,
                const mat4& matrix, PhotonBeam& beam ){
    bool scatt = false;
@@ -356,6 +387,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
    } else {
      average_extinction = extinction_c;
    }
+
 
    float diff;
    float scattered  = uniform( generator );
@@ -391,7 +423,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        PhotonBeam scattered;
        scattered.ada_width = false;
        CastBeam( bounce, new_energy, start, dir_sample,
-                 min_point, max_point, beams,
+                 min_point, max_point, other, add_to,
                  radius, triangles, matrix, scattered );
 
        if( SHORT_BEAMS ){
@@ -436,7 +468,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        beam.absorbed= false;
      }
 
-     beams.push_back( beam );
+     add_to.push_back( beam );
 
      max_point.x = fmax( beam.end.x, fmax( beam.start.x, max_point.x ) );
      max_point.y = fmax( beam.end.y, fmax( beam.start.y, max_point.y ) );
@@ -476,7 +508,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        PhotonBeam bounced;
        bounced.ada_width = false;
        CastBeam( num, new_energy, hit.position + ( normal * 0.0001f ), new_direction,
-                 min_point, max_point, beams, radius,
+                 min_point, max_point, other, add_to, radius,
                  triangles, matrix, bounced );
      } else if( ABSORBED > 0 ) {
        beam.absorbed= true;
@@ -544,7 +576,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
        beam.end       = vec4( start + ( t_min * dir ), 1.0f );
      }
 
-     beams.push_back( beam );
+     add_to.push_back( beam );
 
      diff        = glm::length( vec3( beam.end - beam.start ) );
 

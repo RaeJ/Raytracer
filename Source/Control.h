@@ -6,7 +6,7 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 2500
+#define PHOTON_NUMBER 500
 #define BOUNCES 0
 #define ADAPTIVE false
 

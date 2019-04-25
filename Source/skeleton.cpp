@@ -97,9 +97,9 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  SingleRun();
+  // SingleRun();
 
-  // ProduceStopMotion();
+  ProduceStopMotion();
 
   return 0;
 }
@@ -123,13 +123,15 @@ void SingleRun(){
   cout << "Minimum value: " << minimum << endl;
   cout << "Maximum value: " << maximum << endl;
 
-  vector<PhotonBeam> beams;
+  vector<PhotonBeam> beams_const;
+  vector<PhotonBeam> beams_scattered;
   vector<PhotonSeg> items;
 
   cout << "Casting photons" << endl;
-  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-  BoundPhotonBeams( beams, items, triangles );
-  cout << "Beams size: " << beams.size() << "\n";
+  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams_const, beams_scattered, matrix, triangles );
+  BoundPhotonBeams( beams_const, items, triangles );
+  BoundPhotonBeams( beams_scattered, items, triangles );
+  cout << "Beams size: " << ( beams_const.size() + beams_scattered.size() ) << "\n";
   cout << "Segment size: " << items.size() << "\n";
   root = newNode( root_aabb );
   cout << "Building tree" << endl;
@@ -152,7 +154,7 @@ void SingleRun(){
 
   while( Update() )
     {
-      Draw( screen, beams, items );
+      Draw( screen, beams_const, items );
       SDL_Renderframe(screen);
     }
 
@@ -162,27 +164,28 @@ void SingleRun(){
 
 void ProduceStopMotion(){
   // auto start = std::chrono::system_clock::now();
-  vector<PhotonBeam> beams;
+  vector<PhotonBeam> beams_const;
+  vector<PhotonBeam> beams_scattered;
   vector<PhotonSeg> items;
 
-  for( int i=16; i<40; i++ ){
+  CreateSurface( 27, -3.0, 0.016 );
+  mat4 matrix;  TransformationMatrix( matrix );
+  root_matrix = matrix;
+  for( int i=0; i<GRID.geometric_points.size(); i++ ){
+    GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+  }
+
+  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams_const, beams_scattered, matrix, triangles );
+  BoundPhotonBeams( beams_const, items, triangles );
+  BoundPhotonBeams( beams_scattered, items, triangles );
+  root = newNode( root_aabb );
+  BuildTree( root, items );
+
+
+  for( int i=16; i<20; i++ ){
     screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
-    CreateSurface( 27, -3.0, i/1000 );
-    mat4 matrix;  TransformationMatrix( matrix );
-    root_matrix = matrix;
-    for( int i=0; i<GRID.geometric_points.size(); i++ ){
-      GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
-    }
-
-    beams.clear();
-    items.clear();
-    root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-    BoundPhotonBeams( beams, items, triangles );
-    root = newNode( root_aabb );
-    BuildTree( root, items );
-
-    Draw( screen, beams, items );
+    Draw( screen, beams_const, items );
     SDL_Renderframe(screen);
 
     // auto end = std::chrono::system_clock::now();
@@ -197,6 +200,22 @@ void ProduceStopMotion(){
 
     SDL_SaveImage( screen, file );
     KillSDL(screen);
+
+    beams_scattered.clear();
+    items.clear();
+
+    CreateSurface( 27, -3.0, i/1000 );
+    root_matrix = matrix;
+    for( int i=0; i<GRID.geometric_points.size(); i++ ){
+      GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+    }
+
+    vector<PhotonBeam> beams_copy = beams_const;
+    root_aabb = RecastPhotonBeams( beams_copy, beams_scattered, matrix, triangles );
+    BoundPhotonBeams( beams_const, items, triangles );
+    BoundPhotonBeams( beams_scattered, items, triangles );
+    root = newNode( root_aabb );
+    BuildTree( root, items );
   }
 }
 
