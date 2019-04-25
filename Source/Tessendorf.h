@@ -31,7 +31,7 @@ vector<Triangle> waves;
 float gravity = 9.8;
 glm::vec2 wind_dir( 0.424, 0.316 );
 float max_wave = 0.4;
-float amplitude = 0.008;
+float amplitude = 0.3;
 // float max_wave = ( glm::dot( wind_dir, wind_dir ) ) / gravity;
 float step = HALF_W/5;
 // int N = 64;

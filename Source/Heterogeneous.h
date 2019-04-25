@@ -39,7 +39,8 @@ float Extinction3D( const vec4 start,
     vec3 delta_t;
     vec3 ray_orig_grid = vec3( start ) - grid_min;
 
-    t_max = glm::length( vec3( end ) - vec3( start ) );
+
+    t_max = glm::length( vec3( end - start ) );
 
     if ( ray_direction.x < 0 ) {
         delta_t.x = -cell_dimension.x / ray_direction.x;
@@ -77,9 +78,10 @@ float Extinction3D( const vec4 start,
 
     vector<vec3> indexes;
     vector<float> distances;
+    indexes.push_back( cell_index );
+    distances.push_back( t );
     while ( true ) {
-      indexes.push_back( cell_index );
-      distances.push_back( t );
+
       // cout << "( " << cell_index.x << ", " << cell_index.y << ", " << cell_index.z << " )" << endl;
         if ( ( t_x < t_y ) && ( t_x < t_z )) {
             t = t_x; // current t, next intersection with cell along ray
@@ -103,11 +105,17 @@ float Extinction3D( const vec4 start,
             else
                 cell_index.z += 1;
         }
+
         // if some condition is met break from the loop
         if ( cell_index.x < 0 || cell_index.y < 0 ||
             cell_index.x > grid_resolution.x ||
-            cell_index.y > grid_resolution.y ||
-            t > t_max )
+            cell_index.y > grid_resolution.y )
+            break;
+
+        indexes.push_back( cell_index );
+        distances.push_back( t );
+
+        if( t > t_max )
             break;
     }
     vector<float> extinctions;
@@ -130,16 +138,22 @@ float FindAverageExtinction3D( const vec3& start, const vec3& direction,
                              const vec3& cell_dimension,
                              vector<float>& extinctions ){
   float average_extinction = 0;
+  vec3 centre = vec3( 0, 0, 3 );
   for( int i=0; i<indexes.size(); i++ ){
     vec3 intersection_point = start + ( direction * distances[i] );
     vec3 min = cell_dimension * vec3( indexes[i] );
     vec3 delta = intersection_point - min;
     vec3 proportion = abs( delta ) / cell_dimension; //One of these will normally be zero
+    float dc = abs( centre.z - intersection_point.z );
+    float p = ( 1.0 / ( 3 * sqrt( 2.0 * M_PI ) ) ) * exp( pow( dc, 2) / ( 2 * 9 ) );
 
     int t_l = ( ( indexes[i].y ) * ( GRID.side_points ) ) + indexes[i].x;
-    int t_r = t_l + 1;
     int b_l = ( ( indexes[i].y + 1 ) * ( GRID.side_points ) ) + indexes[i].x;
+    if( indexes[i].y + 1 >= GRID.side_points ) b_l = t_l;
+
     int b_r = b_l + 1;
+    int t_r = t_l + 1;
+    if( indexes[i].x + 1 >= GRID.side_points ) t_r = t_l; b_r = b_l;
 
     float tl_ext = GRID.geometric_points[t_l].z;
     float bl_ext = GRID.geometric_points[b_l].z;
@@ -149,7 +163,9 @@ float FindAverageExtinction3D( const vec3& start, const vec3& direction,
     float left   = tl_ext + ( ( bl_ext - tl_ext ) * proportion.y );
     float right  = tr_ext + ( ( br_ext - tr_ext ) * proportion.y );
 
-    float ext_i  = ( left + right ) * proportion.x;
+    // TODO: Add pdf back in
+    // float ext_i  = left + ( ( right - left ) * proportion.x ) * p;
+    float ext_i  = left + ( ( right - left ) * proportion.x );
     if( ext_i  < 0 ){
       cout << "proportion x: " << proportion.x << endl;
       cout << "proportion y: " << proportion.y << endl;

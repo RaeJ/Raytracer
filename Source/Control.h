@@ -6,7 +6,7 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 500
+#define PHOTON_NUMBER 2500
 #define BOUNCES 0
 #define ADAPTIVE false
 
@@ -20,15 +20,15 @@
 #define RUN_ANALYSIS false
 #define EXT_ANALYSIS 0.04f
 
-#define FIXED_RADIUS true
+#define FIXED_RADIUS false
 #define RADIUS 0.05f
 
-#define HETEROGENEOUS false
+#define HETEROGENEOUS true
 
 // TODO: Should fix absorbed at some point
 #define ABSORBED 0.0f
 
-#define SEED 42
+#define SEED 4
 // #define SEED std::chrono::system_clock::now().time_since_epoch().count()
 
 using namespace std;
@@ -39,7 +39,7 @@ using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.5,1);
 // vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
-vec3 light_power = 1.5f * vec3( 1, 1, 1 );
+vec3 light_power = 0.5f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 

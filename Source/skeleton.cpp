@@ -106,12 +106,22 @@ int main( int argc, char* argv[] )
 
 void SingleRun(){
   cout << "Creating grid" << endl;
-  CreateSurface( 37, -3.0, 0.002 );
+  CreateSurface( 27, -3.0, 0.016 );
   mat4 matrix;  TransformationMatrix( matrix );
   root_matrix = matrix;
+
+  float minimum = 10;
+  float maximum = -10;
   for( int i=0; i<GRID.geometric_points.size(); i++ ){
     GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
+    if( GRID.geometric_points[i].z < minimum )
+      minimum = GRID.geometric_points[i].z;
+    if( GRID.geometric_points[i].z > maximum )
+      maximum = GRID.geometric_points[i].z;
   }
+
+  cout << "Minimum value: " << minimum << endl;
+  cout << "Maximum value: " << maximum << endl;
 
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
@@ -128,22 +138,21 @@ void SingleRun(){
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
+  // vec3 cell_dimension = vec3( ACTUAL_WIDTH, ACTUAL_WIDTH, ACTUAL_WIDTH ) /
+  //                       vec3( GRID.side_points - 1, GRID.side_points - 1, ACTUAL_WIDTH );
+  // for( int x=0; x<GRID.side_points - 1; x++ ){
+  //      for( int y=0; y<GRID.side_points - 1; y++ ){
+  //        vec4 min = vec4( ( vec3( x, y, 0) * cell_dimension ) + vec3( -1, -1, 2 ), 1.0f );
+  //        vec4 max = vec4( ( x + 1 ) * cell_dimension.x - 1,
+  //                         ( y + 1 ) * cell_dimension.y - 1,
+  //                         ( 1 ) * cell_dimension.z + 2, 1.0f );
+  //        DrawBox( screen, min, max, vec3( 0, 0, 0.5 ) );
+  //      }
+  //    }
+
   while( Update() )
     {
       Draw( screen, beams, items );
-      // // for( int i=0; i<items.size(); i++ ){
-      // //   // PositionShader( screen, items[i].min, purple );
-      // //   DrawBox( screen, items[i].min, items[i].max, vec3(1,1,1) );
-      // // }
-      // for( int i=0; i<items.size(); i++ ){
-      //   // PositionShader( screen, items[i].min, purple );
-      //   DrawBox( screen, items[i].min, items[i].max, vec3(0,1,0) );
-      // }
-      // RecurseTree( screen, root, vec3( 1, 1, 0 ) );
-      // RecurseTree( screen, root->left, vec3( 1, 0, 0 ) );
-      // RecurseTree( screen, root->left->right, vec3( 1, 1, 1 ) );
-      // // RecurseTree( screen, root->left->right, vec3( 0, 0, 1 ) );
-
       SDL_Renderframe(screen);
     }
 
@@ -152,54 +161,39 @@ void SingleRun(){
 }
 
 void ProduceStopMotion(){
-  auto start = std::chrono::system_clock::now();
-
-  cout << "Creating grid" << endl;
-  CreateSurface( 37, -3.0, 0.002 );
-  mat4 matrix;  TransformationMatrix( matrix );
-  root_matrix = matrix;
-  for( int i=0; i<GRID.geometric_points.size(); i++ ){
-    GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
-  }
-
+  // auto start = std::chrono::system_clock::now();
   vector<PhotonBeam> beams;
   vector<PhotonSeg> items;
 
-  root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-  BoundPhotonBeams( beams, items, triangles );
-  root = newNode( root_aabb );
-  BuildTree( root, items );
-
-  for( int i=4; i<100; i=i+2 ){
+  for( int i=16; i<40; i++ ){
     screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
 
-    // beams.clear();
-    // items.clear();
-    // root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
-    // BoundPhotonBeams( beams, items, triangles );
-    // root = newNode( root_aabb );
-    // BuildTree( root, items );
-
-    Draw( screen, beams, items );
-    SDL_Renderframe(screen);
-
-    auto end = std::chrono::system_clock::now();
-
-    std::chrono::duration<double> elapsed_seconds = end-start;
-
-    std::ostringstream oss;
-    oss << "screenshot_" << elapsed_seconds.count() << "_.bmp";
-    std::string filename = oss.str();
-
-    char *file = new char[filename.length() + 1];
-    std::strcpy(file, filename.c_str());
-
-    CreateSurface( 37, -3.0, i/1000 );
+    CreateSurface( 27, -3.0, i/1000 );
     mat4 matrix;  TransformationMatrix( matrix );
     root_matrix = matrix;
     for( int i=0; i<GRID.geometric_points.size(); i++ ){
       GRID.geometric_points[i] = matrix*GRID.geometric_points[i];
     }
+
+    beams.clear();
+    items.clear();
+    root_aabb = CastPhotonBeams( PHOTON_NUMBER, beams, matrix, triangles );
+    BoundPhotonBeams( beams, items, triangles );
+    root = newNode( root_aabb );
+    BuildTree( root, items );
+
+    Draw( screen, beams, items );
+    SDL_Renderframe(screen);
+
+    // auto end = std::chrono::system_clock::now();
+    // std::chrono::duration<double> elapsed_seconds = end-start;
+
+    std::ostringstream oss;
+    oss << "screenshot_" << i << "_.bmp";
+    std::string filename = oss.str();
+
+    char *file = new char[filename.length() + 1];
+    std::strcpy(file, filename.c_str());
 
     SDL_SaveImage( screen, file );
     KillSDL(screen);
@@ -251,43 +245,18 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
       // PutPixelSDL( screen, x / SSAA, y / SSAA, colour / (float) SSAA );
       PutPixelSDL( screen, x / SSAA, y / SSAA, current / (double) SSAA );
     }
-    // vec4 begin = vec4( 0, 0, 0, 1 );
-    // vec4 finish = matrix * begin;
-    // vector<vec2> dist_ext;
-    // Extinction3D( begin,
-    //               finish,
-    //               GRID,
-    //               dist_ext );
-    // vec3 pixels[SCREEN_WIDTH][SCREEN_HEIGHT] = {};
-    //
-    // for( int i=0; i<beams.size(); i++ ){
-    //   Vertex v1, v2;
-    //   v1.position = beams[i].start;
-    //   v2.position = beams[i].end;
-    //   Pixel proj1; VertexShader( v1, proj1 );
-    //   Pixel proj2; VertexShader( v2, proj2 );
-    //
-    //   int delta_x = abs( proj1.x - proj2.x );
-    //   int delta_y = abs( proj1.y - proj2.y );
-    //   int h = (int) sqrt( ( pow( delta_x, 2 ), pow( delta_y, 2 ) ) );
-    //   int p_num = max( h, max( delta_x, delta_y ) ) + 1;
-    //
-    //   vector<Pixel> result( p_num );
-    //
-    //   Interpolate( proj1, proj2, result );
-    //
-    //   for( int j=0; j<result.size(); j++ ){
-    //     pixels[result[j].x][result[j].y] += vec3(0.08,0,0.08);
-    //   }
-    //   // DrawBeam( screen, beams[i], vec3( 0.1, 0, 0.1 ) );
-    //   // DrawBox( screen, items[i].min, items[i].max, purple );
-    // }
-    // RecurseTree( root );
-    // for( int i=0; i<SCREEN_WIDTH; i++ ){
-    //   for( int j=0; j<SCREEN_HEIGHT; j++ ){
-    //     PixelShader( screen, i, j, pixels[i][j] );
-    //   }
-    // }
+
+    // vec3 cell_dimension = vec3( ACTUAL_WIDTH, ACTUAL_WIDTH, ACTUAL_WIDTH ) /
+    //                       vec3( GRID.side_points - 1, GRID.side_points - 1, ACTUAL_WIDTH );
+    // for( int x=0; x<GRID.side_points - 1; x++ ){
+    //      for( int y=0; y<GRID.side_points - 1; y++ ){
+    //        vec4 min = vec4( ( vec3( x, y, 0) * cell_dimension ) + vec3( -1, -1, 2 ), 1.0f );
+    //        vec4 max = vec4( ( x + 1 ) * cell_dimension.x - 1,
+    //                         ( y + 1 ) * cell_dimension.y - 1,
+    //                         ( 1 ) * cell_dimension.z + 2, 1.0f );
+    //        DrawBox( screen, min, max, vec3( 0, 0, 0.4 ) );
+    //      }
+    //    }
     SDL_Renderframe(screen);
   }
 }
@@ -492,9 +461,13 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
                                               GRID,
                                               dist_ext );
         // if( beam_extinction < 0 || view_extinction < 0 ){
-        // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+        // // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
         //   cout << "Beam extinction: " << beam_extinction << endl;
         //   cout << "View extinction: " << view_extinction << endl;
+        //   cout << "Start ext: " << s.s_ext << endl;
+        //   cout << "End ext: " << s.e_ext << endl;
+        //   cout << "Current ext: " << s.c_ext << endl;
+        //   cout << "Proportion: " << proportion << endl;
         // }
         transmitted       = Transmittance( t_bc, beam_extinction ) *
                             Transmittance( t_cb, view_extinction );

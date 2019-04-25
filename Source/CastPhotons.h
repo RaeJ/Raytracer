@@ -228,12 +228,26 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
      beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
      if( HETEROGENEOUS ){
-       beam_seg.s_ext = dist_ext[current_step].y;
-
-       current_step++;
+       beam_seg.s_ext = dist_ext[current_step-1].y;
+       if( beam_seg.s_ext < 0 ){
+         // cout << "==============================" << endl;
+         // cout << "Current Step: " << current_step << endl;
+         // cout << "Max steps: " << dist_ext.size() << endl;
+         beam_seg.s_ext = mean;
+       }
 
        step           = dist_ext[current_step].x - step;
        beam_seg.e_ext = dist_ext[current_step].y;
+
+       if( beam_seg.e_ext < 0 ){
+         // cout << "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<" << endl;
+         // cout << "Current Step: " << current_step << endl;
+         // cout << "Max steps: " << dist_ext.size() << endl;
+         // cout << "Distance: " << dist_ext[dist_ext.size()-1].x << endl;
+         // cout << "Length: " << j << endl;
+         beam_seg.e_ext = beam_seg.s_ext;
+       }
+       current_step++;
      }
 
      items.push_back( beam_seg );
