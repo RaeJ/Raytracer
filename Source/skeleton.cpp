@@ -47,7 +47,8 @@ void BeamRadiance( screen* screen,
                    const Intersection& limit,
                    Node* parent,
                    glm::dvec3& current,
-                   vector<PhotonBeam>& beams
+                   vector<PhotonBeam>& beams,
+                   int row
                  );
 double Integral_721( PhotonSeg s,
                     CylIntersection i,
@@ -97,9 +98,9 @@ int main( int argc, char* argv[] )
 
   LoadTestModel( triangles );
 
-  // SingleRun();
+  SingleRun();
 
-  ProduceStopMotion();
+  // ProduceStopMotion();
 
   return 0;
 }
@@ -135,7 +136,7 @@ void SingleRun(){
   cout << "Segment size: " << items.size() << "\n";
   root = newNode( root_aabb );
   cout << "Building tree" << endl;
-  BuildTree( root, items );
+  BuildTree( root, items, 0 );
   cout << "Calculating radiance" << endl;
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
@@ -179,7 +180,7 @@ void ProduceStopMotion(){
   BoundPhotonBeams( beams_const, items, triangles );
   BoundPhotonBeams( beams_scattered, items, triangles );
   root = newNode( root_aabb );
-  BuildTree( root, items );
+  BuildTree( root, items, 0 );
 
   int begin  = 16;
   int finish = 24;
@@ -223,7 +224,7 @@ void ProduceStopMotion(){
     BoundPhotonBeams( beams_const, items, triangles );
     BoundPhotonBeams( beams_scattered, items, triangles );
     root = newNode( root_aabb );
-    BuildTree( root, items );
+    BuildTree( root, items, 0 );
   }
 }
 
@@ -239,6 +240,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
     for( int y = 0; y < (SCREEN_HEIGHT * SSAA); y+=SSAA ) {
       glm::dvec3 current = vec3( 0, 0, 0 );
       vec3 colour = vec3( 0, 0, 0 );
+      // cout << "Row x: " << x << endl; // 296
       for( int i = 0; i<SSAA; i++ ){
         for( int j = 0; j<SSAA; j++ ){
           float x_dir = ( x + i ) - ( (SCREEN_WIDTH * SSAA) / (float) 2 );
@@ -264,7 +266,7 @@ void Draw( screen* screen, vector<PhotonBeam> beams, vector<PhotonSeg>& items )
               }
             }
 
-            BeamRadiance( screen, start, direction, c_i, root, current, beams );
+            BeamRadiance( screen, start, direction, c_i, root, current, beams, x );
           }
           // Testing( screen, start, direction, colour, current, beams, items, matrix );
         }
@@ -487,15 +489,16 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
                                               vec4( 0, 0, 0, 1 ) + ( dir * (float) t_cb ),
                                               GRID,
                                               dist_ext );
-        // if( beam_extinction < 0 || view_extinction < 0 ){
-        // // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
-        //   cout << "Beam extinction: " << beam_extinction << endl;
-        //   cout << "View extinction: " << view_extinction << endl;
-        //   cout << "Start ext: " << s.s_ext << endl;
-        //   cout << "End ext: " << s.e_ext << endl;
-        //   cout << "Current ext: " << s.c_ext << endl;
-        //   cout << "Proportion: " << proportion << endl;
-        // }
+        if( beam_extinction < 0 || view_extinction < 0  ||
+            s.e_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+        // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+          cout << "Beam extinction: " << beam_extinction << endl;
+          cout << "View extinction: " << view_extinction << endl;
+          cout << "Start ext: " << s.s_ext << endl;
+          cout << "End ext: " << s.e_ext << endl;
+          cout << "Current ext: " << s.c_ext << endl;
+          cout << "Proportion: " << proportion << endl;
+        }
         transmitted       = Transmittance( t_bc, beam_extinction ) *
                             Transmittance( t_cb, view_extinction );
 
@@ -504,12 +507,16 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
         transmitted       = Transmittance( t_bc, extinction ) *
                             Transmittance( t_cb, extinction );
       }
+      if( transmitted < 1e-6 ){
+        return 0;
+      }
 
       double cos_theta  = glm::dot( ab, cd );
       double sin_theta  = sqrt( 1 - pow( cos_theta, 2 ) );
       double rad        = scattering / s.radius;
+      double result = transmitted * rad / sin_theta;
 
-      return ( transmitted * rad / sin_theta );
+      return ( result );
     } else {
       return 0;
     }
@@ -519,7 +526,7 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
 }
 
 void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& limit, Node* parent,
-                   glm::dvec3& current, vector<PhotonBeam>& beams ){
+                   glm::dvec3& current, vector<PhotonBeam>& beams, int row ){
   vec4 hit;
   float max_distance  = glm::length( limit.position - start );
   AABB box = parent->aabb;
@@ -579,10 +586,10 @@ void BeamRadiance( screen* screen, vec4 start, vec4 dir, const Intersection& lim
         }
       }
       if( parent->left != NULL ){
-        BeamRadiance( screen, start, dir, limit, parent->left, current, beams );
+        BeamRadiance( screen, start, dir, limit, parent->left, current, beams, row );
       }
       if( parent->right != NULL ){
-        BeamRadiance( screen, start, dir, limit, parent->right, current, beams );
+        BeamRadiance( screen, start, dir, limit, parent->right, current, beams, row );
       }
     }
   }
