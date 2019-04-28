@@ -128,7 +128,7 @@ void UpdateHeight( double time )
     GRID.geometric_points[i].z += GRID.height;
     // GRID.geometric_points[i].y *= -1;
   }
-  AddTessendorfWaves();
+  // AddTessendorfWaves();
 }
 
 void AddTessendorfWaves(){

@@ -107,7 +107,7 @@ int main( int argc, char* argv[] )
 
 void SingleRun(){
   cout << "Creating grid" << endl;
-  CreateSurface( 27, -3.0, 0.016 );
+  CreateSurface( 5, -3.0, 0.016 );
   mat4 matrix;  TransformationMatrix( matrix );
   root_matrix = matrix;
 
@@ -489,20 +489,21 @@ double Integral_73( PhotonSeg s, CylIntersection i, float extinction, vec4 dir  
                                               vec4( 0, 0, 0, 1 ) + ( dir * (float) t_cb ),
                                               GRID,
                                               dist_ext );
-        if( beam_extinction < 0 || view_extinction < 0  ||
-            s.e_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
-        // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
-          cout << "Beam extinction: " << beam_extinction << endl;
-          cout << "View extinction: " << view_extinction << endl;
-          cout << "Start ext: " << s.s_ext << endl;
-          cout << "End ext: " << s.e_ext << endl;
-          cout << "Current ext: " << s.c_ext << endl;
-          cout << "Proportion: " << proportion << endl;
-        }
+        // if( beam_extinction < 0 || view_extinction < 0  ||
+        //     s.e_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+        // // if( s.s_ext < 0 || s.e_ext < 0 || s.c_ext < 0 ){
+        //   cout << "Beam extinction: " << beam_extinction << endl;
+        //   cout << "View extinction: " << view_extinction << endl;
+        //   cout << "Start ext: " << s.s_ext << endl;
+        //   cout << "End ext: " << s.e_ext << endl;
+        //   cout << "Current ext: " << s.c_ext << endl;
+        //   cout << "Proportion: " << proportion << endl;
+        // }
         transmitted       = Transmittance( t_bc, beam_extinction ) *
                             Transmittance( t_cb, view_extinction );
 
-        // scattering = ( beam_extinction / extinction_c ) * scattering_c;
+        // TODO: why did I have this commented out?
+        scattering = ( beam_extinction / extinction_c ) * scattering_c;
       } else {
         transmitted       = Transmittance( t_bc, extinction ) *
                             Transmittance( t_cb, extinction );

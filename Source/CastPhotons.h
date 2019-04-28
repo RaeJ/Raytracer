@@ -127,9 +127,9 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    vec4 start   = b.start;
    vec4 end     = b.end;
 
-   vec3 diff    = vec3( end - start );
+   vec3 diff    = vec3( end ) - vec3( start );
    vec3 dir     = glm::normalize( diff );
-   float length = glm::length( vec3( end ) - vec3( start ) );
+   float length = glm::length( diff );
    float j=0;
 
    float theta_x = fmin( acos( glm::dot( dir, x_dir ) ), acos( glm::dot( dir, -x_dir ) ) );
@@ -143,14 +143,18 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    float mean = 0;
    if( HETEROGENEOUS ){
      Extinction3D( start, end, GRID, dist_ext );
-     step = fmin( length, dist_ext[current_step].x ); //[0] would be zero
+     if( dist_ext.size() > 1 ){
+       step = dist_ext[current_step].x; //[0] would be zero
+     } else{
+       step = length;
+     }
    } else if( b.ada_width ) {
      step = length;
    }
 
    vec3 prior   = vec3( start.x, start.y, start.z );
 
-   while( j<length ){
+   while( j<length && length>1e-6 ){
      PhotonSeg beam_seg;
      vec3 next = prior + ( dir * step );
 
@@ -239,9 +243,9 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      if( HETEROGENEOUS ){
        beam_seg.s_ext = dist_ext[current_step-1].y;
        if( beam_seg.s_ext < 0 ){
-         // cout << "==============================" << endl;
-         // cout << "Current Step: " << current_step << endl;
-         // cout << "Max steps: " << dist_ext.size() << endl;
+         cout << "==============================" << endl;
+         cout << "Current Step: " << current_step << endl;
+         cout << "Max steps: " << dist_ext.size() << endl;
          beam_seg.s_ext = mean;
        }
 
@@ -249,11 +253,11 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
        beam_seg.e_ext = dist_ext[current_step].y;
 
        if( beam_seg.e_ext < 0 ){
-         // cout << "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<" << endl;
-         // cout << "Current Step: " << current_step << endl;
-         // cout << "Max steps: " << dist_ext.size() << endl;
-         // cout << "Distance: " << dist_ext[dist_ext.size()-1].x << endl;
-         // cout << "Length: " << j << endl;
+         cout << "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<" << endl;
+         cout << "Current Step: " << current_step << endl;
+         cout << "Max steps: " << dist_ext.size() << endl;
+         cout << "Distance: " << dist_ext[dist_ext.size()-1].x << endl;
+         cout << "Length: " << j << endl;
          beam_seg.e_ext = beam_seg.s_ext;
        }
        current_step++;
@@ -659,7 +663,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        }
      }
    }
-   if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
    if( same ) dim = 0;
  } else if( diff.y > diff.z ){
    for( int i=0; i<child.size(); i++ ){
@@ -678,7 +682,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        }
      }
    }
-   if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
    if( same ) dim = 1;
  } else {
    for( int i=0; i<child.size(); i++ ){
@@ -697,7 +701,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        }
      }
    }
-   if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
    if( same ) dim = 2;
  }
  // TODO: There has to be a better way of doing this
@@ -722,7 +726,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -760,7 +764,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -800,7 +804,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -838,7 +842,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -878,7 +882,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -916,7 +920,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            }
          }
        }
-       if( leftovers.size() < ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -941,7 +945,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
    }
  }
 
-if( leftover > leftovers.size() ){
+// if( leftover > leftovers.size() ){
   for( int i = 0; i<leftovers.size(); i++ ){
     if( uniform( generator ) < 0.5 ){
       l.push_back( leftovers[i] );
@@ -949,7 +953,7 @@ if( leftover > leftovers.size() ){
       r.push_back( leftovers[i] );
     }
   }
-}
+// }
 
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();
