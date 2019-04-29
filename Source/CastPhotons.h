@@ -646,6 +646,15 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l
 }
 
 void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& center, int leftover ){
+  if( child.size() <= 0 ){
+    return;
+  }
+  if( child.size() == 1 ){
+    PhotonSeg box = child[0];
+    parent->segment = box;
+    parent->leaf    = true;
+    return;
+  }
   parent->leaf = false;
 
   vector<PhotonSeg> l;
@@ -658,7 +667,7 @@ void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& ce
     new_whd.x = whd.x / 2.0f;
     for( int i=0; i<child.size(); i++ ){
       PhotonSeg box = child[i];
-      if( abs( box.min.x - box.max.x ) >= new_whd.x){
+      if( abs( box.min.x - box.max.x ) >= new_whd.x ){
         AABB aabb; aabb.min = box.min; aabb.max = box.max;
         NodeGen *new_node = newNodeGen( aabb );
         new_node->leaf = true;
@@ -682,7 +691,7 @@ void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& ce
     new_whd.y = whd.y / 2.0f;
     for( int i=0; i<child.size(); i++ ){
       PhotonSeg box = child[i];
-      if( abs( box.min.y - box.max.y ) >= new_whd.y){
+      if( abs( box.min.y - box.max.y ) >= new_whd.y ){
         AABB aabb; aabb.min = box.min; aabb.max = box.max;
         NodeGen *new_node = newNodeGen( aabb );
         new_node->leaf = true;
@@ -706,7 +715,7 @@ void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& ce
     new_whd.z = whd.z / 2.0f;
     for( int i=0; i<child.size(); i++ ){
       PhotonSeg box = child[i];
-      if( abs( box.min.z - box.max.z ) >= new_whd.z){
+      if( abs( box.min.z - box.max.z ) >= new_whd.z ){
         AABB aabb; aabb.min = box.min; aabb.max = box.max;
         NodeGen *new_node = newNodeGen( aabb );
         new_node->leaf = true;
@@ -738,8 +747,11 @@ void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& ce
     }
   // }
     // cout << "5." << endl;
-   vec3 diff_whd = whd - new_whd;
-   vec3 new_center = center - ( diff_whd / 2.0f );
+   vec3 diff_whd = abs( whd - new_whd );
+   vec3 new_center;
+   new_center.x = center.x - ( diff_whd.x / 2.0f );
+   new_center.y = center.y - ( diff_whd.y / 2.0f );
+   new_center.z = center.z + ( diff_whd.z / 2.0f );
    vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
    int l_size = l.size();
    if( l_size != 0 ){
@@ -759,7 +771,10 @@ void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& ce
      BuildKdTree( left_node, l, new_whd, new_center, leftovers.size() );
    }
    // cout << "6." << endl;
-   new_center = center + ( diff_whd / 2.0f );
+
+   new_center.x = center.x + ( diff_whd.x / 2.0f );
+   new_center.y = center.y + ( diff_whd.y / 2.0f );
+   new_center.z = center.z - ( diff_whd.z / 2.0f );
    min = vec4( m, m, -m, 1 ); max = vec4( -m, -m, m, 1 );
    int r_size = r.size();
    if( r_size != 0 ){
@@ -1046,7 +1061,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
    }
  }
 // cout << "4." << endl;
-// if( leftover != leftovers.size() ){
+if( !HETEROGENEOUS || ( leftover > leftovers.size() )  ){
   for( int i = 0; i<leftovers.size(); i++ ){
     if( uniform( generator ) < 0.5 ){
       l.push_back( leftovers[i] );
@@ -1054,7 +1069,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
       r.push_back( leftovers[i] );
     }
   }
-// }
+}
   // cout << "5." << endl;
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();

@@ -106,7 +106,7 @@ float Extinction3D( const vec4 start,
             else
                 cell_index.z += 1;
         }
-        
+
         if( t > t_max || cell_index.x < 0 || cell_index.y < 0 ||
             cell_index.x > grid_resolution.x ||
             cell_index.y > grid_resolution.y  ){
@@ -166,8 +166,8 @@ float FindAverageExtinction3D( const vec3& start, const vec3& direction,
     float right  = tr_ext + ( ( br_ext - tr_ext ) * proportion.y );
 
     // TODO: Add pdf back in
-    // float ext_i  = left + ( ( right - left ) * proportion.x ) * p;
-    float ext_i  = left + ( ( right - left ) * proportion.x );
+    float ext_i  = left + ( ( right - left ) * proportion.x ) * p;
+    // float ext_i  = left + ( ( right - left ) * proportion.x );
     if( ext_i  < 0 ){
       cout << "proportion x: " << proportion.x << endl;
       cout << "proportion y: " << proportion.y << endl;
