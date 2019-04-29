@@ -23,7 +23,28 @@ struct PhotonBeam
   glm::dvec3 energy;
   int index_hit;
   bool absorbed;
+  bool scattered;
 };
+
+struct NodeGen
+{
+    int key;
+    AABB aabb;
+    bool leaf;
+    PhotonSeg segment;
+    vector<NodeGen *>child;
+};
+
+ // Utility function to create a new tree node
+NodeGen *newNodeGen(AABB data)
+{
+    NodeGen *temp = new NodeGen;
+    temp->aabb = data;
+    temp->leaf = false;
+    PhotonSeg init; init.id = -1;
+    temp->segment = init;
+    return temp;
+}
 
 struct Node
 {
@@ -57,6 +78,8 @@ struct Node* newNode( AABB data )
 // -------------------------------------------------------------------------- //
 // GLOBAL VARIABLES
 
+int tree_segments = 0;
+
 vector<PhotonSeg> segments;
 
 std::mt19937 generator ( SEED );
@@ -79,6 +102,7 @@ AABB CastPhotonBeams( int number,
                       const vector<Triangle>& triangles );
 vec4 FindDirection( vec4 origin, vec4 centre, float radius );
 void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover );
+void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& center, int leftover );
 void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, const vector<Triangle>& triangles );
 void CastBeam( int bounce,
                vec3 energy,
@@ -140,14 +164,11 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
 
    vector<vec2> dist_ext;
    int current_step = 1;
-   float mean = 0;
+   float mean = extinction_c;
    if( HETEROGENEOUS ){
      Extinction3D( start, end, GRID, dist_ext );
-     if( dist_ext.size() > 1 ){
-       step = dist_ext[current_step].x; //[0] would be zero
-     } else{
-       step = length;
-     }
+     // step = dist_ext[current_step].x; //[0] would be zero
+     mean = dist_ext[current_step-1].y;
    } else if( b.ada_width ) {
      step = length;
    }
@@ -155,12 +176,15 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
    vec3 prior   = vec3( start.x, start.y, start.z );
 
    while( j<length && length>1e-6 ){
+     if( HETEROGENEOUS ){
+       step           = dist_ext[current_step].x - dist_ext[current_step-1].x;
+     }
      PhotonSeg beam_seg;
      vec3 next = prior + ( dir * step );
 
      beam_seg.start  = vec4( prior.x, prior.y, prior.z, 1.0f );
      if( HETEROGENEOUS ){
-       mean = mean + ( ( dist_ext[current_step-1].y - mean ) / current_step );
+       mean = mean + ( ( dist_ext[current_step].y - mean ) / ( current_step + 1 ) );
      } else {
        mean = extinction_c;
      }
@@ -191,6 +215,12 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      } else {
        beam_seg.radius = b.radius;
        beam_seg.ada_width  = false;
+     }
+
+     if( b.scattered ){
+       beam_seg.scattered = true;
+     } else {
+       beam_seg.scattered = false;
      }
 
      beam_seg.id     = i;
@@ -242,23 +272,11 @@ void BoundPhotonBeams( vector<PhotonBeam>& beams, vector<PhotonSeg>& items, cons
      beam_seg.mid    = ( beam_seg.min + beam_seg.max ) / 2.0f;
      if( HETEROGENEOUS ){
        beam_seg.s_ext = dist_ext[current_step-1].y;
-       if( beam_seg.s_ext < 0 ){
-         cout << "==============================" << endl;
-         cout << "Current Step: " << current_step << endl;
-         cout << "Max steps: " << dist_ext.size() << endl;
-         beam_seg.s_ext = mean;
-       }
 
-       step           = dist_ext[current_step].x - step;
        beam_seg.e_ext = dist_ext[current_step].y;
 
-       if( beam_seg.e_ext < 0 ){
-         cout << "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<" << endl;
-         cout << "Current Step: " << current_step << endl;
-         cout << "Max steps: " << dist_ext.size() << endl;
-         cout << "Distance: " << dist_ext[dist_ext.size()-1].x << endl;
-         cout << "Length: " << j << endl;
-         beam_seg.e_ext = beam_seg.s_ext;
+       if( current_step == dist_ext.size()-1 ){
+         j = length + 1;
        }
        current_step++;
      }
@@ -376,6 +394,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
                float radius, const vector<Triangle>& triangles,
                const mat4& matrix, PhotonBeam& beam ){
    bool scatt = false;
+   beam.scattered = false;
 
    Intersection hit;
    float t_s, average_extinction;
@@ -433,6 +452,7 @@ void CastBeam( int bounce, vec3 energy, vec4 origin, vec4 direction,
          new_energy.z = fmin( energy.z, fmax( new_energy.z, 0 ) );
 
          PhotonBeam scattered;
+         scattered.scattered = true;
          scattered.ada_width = false;
          CastBeam( bounce, new_energy, start, dir_sample,
                    min_point, max_point, other, add_to,
@@ -625,13 +645,152 @@ bool intersectPlane(const vec3 &n, const vec3 &p0, const vec3 &l0, const vec3 &l
     return false;
 }
 
+void BuildKdTree( NodeGen* parent, vector<PhotonSeg>& child, vec3& whd, vec3& center, int leftover ){
+  parent->leaf = false;
+
+  vector<PhotonSeg> l;
+  vector<PhotonSeg> r;
+  vector<PhotonSeg> leftovers;
+  vec3 new_whd    = whd;
+
+  bool same = true;
+  if( ( whd.x > whd.y ) && ( whd.x > whd.z ) ){
+    new_whd.x = whd.x / 2.0f;
+    for( int i=0; i<child.size(); i++ ){
+      PhotonSeg box = child[i];
+      if( abs( box.min.x - box.max.x ) >= new_whd.x){
+        AABB aabb; aabb.min = box.min; aabb.max = box.max;
+        NodeGen *new_node = newNodeGen( aabb );
+        new_node->leaf = true;
+        new_node->segment = box;
+        (parent->child).push_back( new_node );
+        tree_segments++;
+      } else {
+        if( box.mid.x < center.x ){
+          l.push_back( box );
+          same = false;
+        }  else if( box.mid.x > center.x ) {
+          r.push_back( box );
+          same = false;
+        } else if( !same ){
+          leftovers.push_back( box );
+        }
+      }
+    }
+    if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
+  } else if( whd.y > whd.z ){
+    new_whd.y = whd.y / 2.0f;
+    for( int i=0; i<child.size(); i++ ){
+      PhotonSeg box = child[i];
+      if( abs( box.min.y - box.max.y ) >= new_whd.y){
+        AABB aabb; aabb.min = box.min; aabb.max = box.max;
+        NodeGen *new_node = newNodeGen( aabb );
+        new_node->leaf = true;
+        new_node->segment = box;
+        (parent->child).push_back( new_node );
+        tree_segments++;
+      } else {
+        if( box.mid.y < center.y ){
+          l.push_back( box );
+          same = false;
+        }  else if( box.mid.y > center.y ){
+          r.push_back( box );
+          same = false;
+        } else if( !same ){
+           leftovers.push_back( box );
+        }
+      }
+    }
+    if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
+  } else {
+    new_whd.z = whd.z / 2.0f;
+    for( int i=0; i<child.size(); i++ ){
+      PhotonSeg box = child[i];
+      if( abs( box.min.z - box.max.z ) >= new_whd.z){
+        AABB aabb; aabb.min = box.min; aabb.max = box.max;
+        NodeGen *new_node = newNodeGen( aabb );
+        new_node->leaf = true;
+        new_node->segment = box;
+        (parent->child).push_back( new_node );
+        tree_segments++;
+      } else {
+        if( box.mid.z > center.z ){
+          l.push_back( box );
+          same = false;
+        } else if( box.mid.z < center.z ){
+          r.push_back( box );
+          same = false;
+        } else if( !same ){
+          leftovers.push_back( box );
+        }
+      }
+    }
+    if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
+  }
+
+  // if( leftover != leftovers.size() ){
+    for( int i = 0; i<leftovers.size(); i++ ){
+      if( uniform( generator ) < 0.5 ){
+        l.push_back( leftovers[i] );
+      } else {
+        r.push_back( leftovers[i] );
+      }
+    }
+  // }
+    // cout << "5." << endl;
+   vec3 diff_whd = whd - new_whd;
+   vec3 new_center = center - ( diff_whd / 2.0f );
+   vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
+   int l_size = l.size();
+   if( l_size != 0 ){
+     max.x = new_center.x + ( new_whd.x / 2.0f );
+     max.y = new_center.y + ( new_whd.y / 2.0f );
+     max.z = new_center.z - ( new_whd.z / 2.0f );
+     min.x = new_center.x - ( new_whd.x / 2.0f );
+     min.y = new_center.y - ( new_whd.y / 2.0f );
+     min.z = new_center.z + ( new_whd.z / 2.0f );
+
+     AABB left_child;
+     left_child.min = vec4( min.x, min.y, min.z, 1.0f );
+     left_child.max = vec4( max.x, max.y, max.z, 1.0f );
+     left_child.mid = ( left_child.min + left_child.max ) / 2.0f;
+     NodeGen *left_node = newNodeGen( left_child );
+     (parent->child).push_back(left_node);
+     BuildKdTree( left_node, l, new_whd, new_center, leftovers.size() );
+   }
+   // cout << "6." << endl;
+   new_center = center + ( diff_whd / 2.0f );
+   min = vec4( m, m, -m, 1 ); max = vec4( -m, -m, m, 1 );
+   int r_size = r.size();
+   if( r_size != 0 ){
+     max.x = new_center.x + ( new_whd.x / 2.0f );
+     max.y = new_center.y + ( new_whd.y / 2.0f );
+     max.z = new_center.z - ( new_whd.z / 2.0f );
+     min.x = new_center.x - ( new_whd.x / 2.0f );
+     min.y = new_center.y - ( new_whd.y / 2.0f );
+     min.z = new_center.z + ( new_whd.z / 2.0f );
+
+     AABB right_child;
+     right_child.min = vec4( min.x, min.y, min.z, 1.0f );
+     right_child.max = vec4( max.x, max.y, max.z, 1.0f );
+     right_child.mid = ( right_child.min + right_child.max ) / 2.0f;
+     NodeGen *right_node = newNodeGen( right_child );
+     (parent->child).push_back(right_node);
+     BuildKdTree( right_node, r, new_whd, new_center, leftovers.size() );
+   }
+
+}
+
 void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
+  // cout << "1." << endl;
  if( child.size() <= 2 ) {
    parent->leaf = true;
    for( int i=0; i<child.size(); i++ ){
      // parent->segments.push_back( child[i] );
+     parent->leaf = true;
      parent->segments[i] = child[i];
      segments.push_back( child[i] );
+     tree_segments++;
    }
    return;
  }
@@ -643,6 +802,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
  vector<PhotonSeg> l;
  vector<PhotonSeg> r;
  vector<PhotonSeg> leftovers;
+ // cout << "2." << endl;
 
  bool same = true;
  int dim   = -1;
@@ -656,14 +816,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        r.push_back( box );
        same = false;
      } else if( !same ){
-       if( i < 2 ){
-         parent->segments[i] = box;
-       } else {
-         leftovers.push_back( box );
-       }
+       leftovers.push_back( box );
      }
    }
-   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
    if( same ) dim = 0;
  } else if( diff.y > diff.z ){
    for( int i=0; i<child.size(); i++ ){
@@ -675,14 +831,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        r.push_back( box );
        same = false;
      } else if( !same ){
-       if( i < 2 ){
-         parent->segments[i] = box;
-       } else {
-         leftovers.push_back( box );
-       }
+        leftovers.push_back( box );
      }
    }
-   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
    if( same ) dim = 1;
  } else {
    for( int i=0; i<child.size(); i++ ){
@@ -694,16 +846,13 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
        r.push_back( box );
        same = false;
      } else if( !same ){
-       if( i < 2 ){
-         parent->segments[i] = box;
-       } else {
-         leftovers.push_back( box );
-       }
+       leftovers.push_back( box );
      }
    }
-   if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+   if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
    if( same ) dim = 2;
  }
+ // cout << "3." << endl;
  // TODO: There has to be a better way of doing this
  if( same ){
    l.clear();
@@ -719,14 +868,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -739,11 +884,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
@@ -757,14 +898,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -777,11 +914,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
@@ -797,14 +930,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -817,11 +946,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
@@ -835,14 +960,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -855,11 +976,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
@@ -875,14 +992,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -895,11 +1008,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
@@ -913,14 +1022,10 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
            r.push_back( box );
            same = false;
          } else if( !same ){
-           if( i < 2 ){
-             parent->segments[i] = box;
-           } else {
-             leftovers.push_back( box );
-           }
+           leftovers.push_back( box );
          }
        }
-       if( leftovers.size() > ( l.size() + r.size() ) ) same = true;
+       if( leftovers.size() > ( ( l.size() + r.size() ) / 2 ) ) same = true;
        if( same ){
          l.clear();
          r.clear();
@@ -933,19 +1038,15 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
              r.push_back( box );
              same = false;
            } else {
-             if( i < 2 ){
-               parent->segments[i] = box;
-             } else {
-               leftovers.push_back( box );
-             }
+             leftovers.push_back( box );
            }
          }
        }
      }
    }
  }
-
-// if( leftover > leftovers.size() ){
+// cout << "4." << endl;
+// if( leftover != leftovers.size() ){
   for( int i = 0; i<leftovers.size(); i++ ){
     if( uniform( generator ) < 0.5 ){
       l.push_back( leftovers[i] );
@@ -954,7 +1055,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
     }
   }
 // }
-
+  // cout << "5." << endl;
  vec4 min = vec4( m, m, -m, 1 ); vec4 max = vec4( -m, -m, m, 1 );
  int l_size = l.size();
  if( l_size != 0 ){
@@ -977,6 +1078,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
  } else {
    parent -> left = NULL;
  }
+ // cout << "6." << endl;
 
  min = vec4( m, m, -m, 1 ); max = vec4( -m, -m, m, 1 );
  int r_size = r.size();
@@ -999,6 +1101,7 @@ void BuildTree( Node* parent, vector<PhotonSeg>& child, int leftover ){
  } else {
    parent -> right = NULL;
  }
+ // cout << "7." << endl;
 
 }
 

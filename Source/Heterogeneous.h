@@ -75,6 +75,7 @@ float Extinction3D( const vec4 start,
 
     float t = 0;
     vec3 cell_index = floor( ray_orig_grid / cell_dimension );
+    vec3 prev_index = cell_index;
 
     vector<vec3> indexes;
     vector<float> distances;
@@ -105,18 +106,19 @@ float Extinction3D( const vec4 start,
             else
                 cell_index.z += 1;
         }
-
-        // if some condition is met break from the loop
-        if ( cell_index.x < 0 || cell_index.y < 0 ||
+        
+        if( t > t_max || cell_index.x < 0 || cell_index.y < 0 ||
             cell_index.x > grid_resolution.x ||
-            cell_index.y > grid_resolution.y )
-            break;
+            cell_index.y > grid_resolution.y  ){
+          indexes.push_back( prev_index );
+          distances.push_back( t_max );
+          break;
+        } else {
+          indexes.push_back( cell_index );
+          distances.push_back( t );
+        }
 
-        indexes.push_back( cell_index );
-        distances.push_back( t );
-
-        if( t > t_max )
-            break;
+        prev_index = cell_index;
     }
     vector<float> extinctions;
     float average_extinction = FindAverageExtinction3D( ray_orig_grid,
