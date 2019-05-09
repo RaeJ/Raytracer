@@ -4,7 +4,7 @@ FILE=skeleton
 #   Directories
 S_DIR=Source
 B_DIR=Build
-GLMDIR=../glm
+GLMDIR=glm
 
 ########
 #   Output
