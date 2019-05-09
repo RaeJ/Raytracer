@@ -159,6 +159,27 @@ void HeterogeneousRun(){
   vec3 cell_dimension = vec3( ACTUAL_WIDTH, ACTUAL_WIDTH, ACTUAL_WIDTH ) /
                       vec3( GRID.side_points - 1, GRID.side_points - 1, ACTUAL_WIDTH );
 
+  // vector<PhotonSeg> q1, q2, q3, q4;
+  // float y1=ACTUAL_WIDTH/4, y2=ACTUAL_WIDTH/2, y3=3*ACTUAL_WIDTH/4, y4=ACTUAL_WIDTH;
+
+  // for( int i=0; i<lost_segments.size(); i++ ){
+  //   PhotonSeg segment = lost_segments[i];
+  //   if( segment.mid.y > 0 && segment.mid.y < y1 ){
+  //     q1.push_back( segment );
+  //   } else if( segment.mid.y > y1 && segment.mid.y < y2 ){
+  //     q2.push_back( segment );
+  //   } else if( segment.mid.y > y2 && segment.mid.y < y3 ){
+  //     q3.push_back( segment );
+  //   } else if( segment.mid.y > y3 && segment.mid.y < y4 ){
+  //     q4.push_back( segment );
+  //   }
+  // }
+  //
+  // cout << "q1: " << q1.size() << endl;
+  // cout << "q2: " << q2.size() << endl;
+  // cout << "q3: " << q3.size() << endl;
+  // cout << "q4: " << q4.size() << endl;
+
   while( Update() )
     {
       DrawHet( screen, beams_const, beams_scattered, new_root );

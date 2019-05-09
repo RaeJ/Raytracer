@@ -81,6 +81,7 @@ struct Node* newNode( AABB data )
 int tree_segments = 0;
 
 vector<PhotonSeg> segments;
+vector<PhotonSeg> lost_segments;
 
 std::mt19937 generator ( SEED );
 std::uniform_real_distribution<double> uniform(0.0, 1.0);
@@ -1068,6 +1069,10 @@ if( !HETEROGENEOUS || ( leftover > leftovers.size() )  ){
     } else {
       r.push_back( leftovers[i] );
     }
+  }
+} else {
+  for( int i = 0; i<leftovers.size(); i++ ){
+    lost_segments.push_back( leftovers[i] );
   }
 }
   // cout << "5." << endl;

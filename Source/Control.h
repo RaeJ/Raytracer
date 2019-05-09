@@ -6,7 +6,7 @@
 #define FULLSCREEN_MODE false
 #define SSAA 1
 
-#define PHOTON_NUMBER 4000
+#define PHOTON_NUMBER 1000
 #define BOUNCES 0
 #define ADAPTIVE false
 
@@ -39,7 +39,7 @@ using glm::mat4;
 
 vec4 light_position(0,-0.8,-0.5,1);
 // vec3 light_power = 0.00002f * vec3( 1, 1, 1 );
-vec3 light_power = 0.1f * vec3( 1, 1, 1 );
+vec3 light_power = 0.5f * vec3( 1, 1, 1 );
   // NOTE: 0.025 is good
 // vec3 light_power = 20.1f * vec3( 1, 1, 1 );
 
